@@ -1,4 +1,4 @@
--- Attiva l'estensione uuid-ossp
+-- questo codice e presente su supabase NON IN LOCALE NEL PROGETTO DA USARE SOLO PER TEST 
 create extension if not exists "uuid-ossp";
 
 create table IF NOT EXISTS profiles (
