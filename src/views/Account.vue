@@ -467,15 +467,17 @@ const fetchProfile = async () => {
 // Update user profile
 const updateProfile = async () => {
   try {
+    // Assicurati che user_id corrisponda alla chiave primaria usata nella tabella profiles
     const { data, error } = await supabase
       .from("profiles")
       .upsert({
+        id: user.value.id, // Assicurati che questo campo corrisponda alla chiave primaria
         user_id: user.value.id,
         first_name: profileData.value.first_name,
         last_name: profileData.value.last_name,
         phone: profileData.value.phone,
         description: profileData.value.description,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       })
       .select();
 
@@ -486,9 +488,10 @@ const updateProfile = async () => {
       successMessage.value = "";
     }, 3000);
   } catch (error) {
-    errorMessage.value =
-      "Errore durante l'aggiornamento del profilo: " + error.message;
     console.error("Error updating profile:", error);
+    errorMessage.value =
+      "Errore durante l'aggiornamento del profilo: " +
+      (error.message || JSON.stringify(error));
   }
 };
 
