@@ -1,60 +1,63 @@
 <template>
-  <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0" />
-  <title>Accedi - PiegaLibro</title>
-  <link
-    rel="stylesheet"
-    href="styles.css" />
-  <header>
-    <h1>PiegaLibro</h1>
-    <nav>
-      <button class="add-book">Aggiungi Libro +</button>
-      <span class="icon">❤️</span>
-      <span class="icon">🛒</span>
-      <span class="icon">👤</span>
-    </nav>
-  </header>
-  <div class="container">
-    <div class="image-section">
-      <img
-        src="../assets/pexels-mikhail-nilov-9158370.jpg"
-        alt="Persona con libri" />
-    </div>
-    <div class="form-section">
-      <h2>Accedi all'Account</h2>
-      <p>Inserisci i tuoi dati</p>
-      <form>
-        <input
-          type="email"
-          placeholder="Email o Numero di Telefono"
-          required />
-        <input
-          type="password"
-          placeholder="Password"
-          required />
-        <button
-          type="submit"
-          class="create-account">
-          Accedi
-        </button>
-      </form>
+  <div class="registration-page">
+    <header>
+      <h1>PiegaLibro</h1>
+      <nav>
+        <button class="add-book">Aggiungi Libro +</button>
+        <span class="icon">❤️</span>
+        <span class="icon">🛒</span>
+        <span class="icon">👤</span>
+      </nav>
+    </header>
 
-      <button class="google-signup">
-        <img
-          src="../assets/Google.png"
-          alt="Accedi con Google" />
-        Accedi con Google
-      </button>
+    <main>
+      <div class="container">
+        <div class="image-section">
+          <img
+            src="../assets/pexels-george-milton-7034789.jpg"
+            alt="Donna con libri" />
+        </div>
 
-      <a
-        href="#"
-        class="forgot-password-link"
-        >Password dimenticata?</a
-      >
-      <p>Non hai un account? <a href="/Signup.html">Registrati</a></p>
-    </div>
+        <div class="form-section">
+          <h2>Crea un account</h2>
+          <p>Inserisci i tuoi dati</p>
+
+          <form @submit.prevent="handleSubmit">
+            <input
+              v-model="formData.name"
+              type="text"
+              placeholder="Nome"
+              required />
+            <input
+              v-model="formData.email"
+              type="email"
+              placeholder="Email o Numero di telefono"
+              required />
+            <input
+              v-model="formData.password"
+              type="password"
+              placeholder="Password"
+              required />
+            <button
+              type="submit"
+              class="create-account">
+              Crea Account
+            </button>
+          </form>
+
+          <button class="google-signup">
+            <img
+              src="../assets/Google.png"
+              alt="Sign up con Google" />
+            Registrati con Google
+          </button>
+
+          <p>
+            Hai già un account? <router-link to="/login">Accedi</router-link>
+          </p>
+        </div>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -137,7 +140,8 @@ const submitForm = async () => {
   }
 };
 </script>
-<style>
+
+<style scoped>
 * {
   margin: 0;
   padding: 0;
@@ -200,8 +204,8 @@ nav {
   border-radius: 10px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   margin-left: 20px;
-  width: 800px; /* Larghezza Aumentata */
-  box-sizing: border-box; /* Importante per includere padding e bordi */
+  width: 800px;
+  box-sizing: border-box;
 }
 
 h2 {
@@ -241,28 +245,17 @@ input {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-sizing: border-box;
+  margin-top: 15px;
 }
 
 .google-signup img {
   width: 20px;
   height: 20px;
+  margin-right: 10px;
 }
 
 a {
   color: #6a5acd;
   text-decoration: none;
-}
-
-.forgot-password-link {
-  display: inline-block;
-  margin-top: 10px;
-  color: #6a5acd;
-  text-decoration: none;
-  font-size: 0.9em;
-}
-
-.forgot-password-link:hover {
-  text-decoration: underline;
 }
 </style>
