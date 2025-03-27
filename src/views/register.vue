@@ -22,6 +22,13 @@
           <h2>Crea un account</h2>
           <p>Inserisci i tuoi dati</p>
 
+          <!-- Mostra messaggi di errore -->
+          <div
+            v-if="errorMessage"
+            class="error-message">
+            {{ errorMessage }}
+          </div>
+
           <form @submit.prevent="handleSubmit">
             <input
               v-model="formData.name"
@@ -45,7 +52,9 @@
             </button>
           </form>
 
-          <button class="google-signup">
+          <button
+            @click="signUpWithGoogle"
+            class="google-signup">
             <img
               src="../assets/Google.png"
               alt="Sign up con Google" />
@@ -76,9 +85,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const router = useRouter();
 
 // Form state
-const email = ref("");
-const password = ref("");
-const isLogin = ref(true);
+const formData = ref({
+  name: "",
+  email: "",
+  password: "",
+});
 const errorMessage = ref("");
 
 // Check if user is already logged in
@@ -90,53 +101,72 @@ onMounted(async () => {
 });
 
 // Handle form submission
-const submitForm = async () => {
+const handleSubmit = async () => {
   try {
     errorMessage.value = "";
 
-    if (isLogin.value) {
-      // Handle login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.value,
-        password: password.value,
-      });
+    // Handle registration
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.value.email,
+      password: formData.value.password,
+      options: {
+        data: {
+          name: formData.value.name,
+        },
+      },
+    });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Successful login
-      router.push("/shop");
-    } else {
-      // Handle registration
-      const { data, error } = await supabase.auth.signUp({
-        email: email.value,
-        password: password.value,
-      });
-
-      if (error) throw error;
-
-      if (
-        data.user &&
-        data.user.identities &&
-        data.user.identities.length === 0
-      ) {
-        errorMessage.value = "This email is already registered. Please login.";
-        isLogin.value = true;
-        return;
-      }
-
-      // If email confirmation is required
-      if (data.user && !data.session) {
-        errorMessage.value = "Please check your email for confirmation link.";
-        return;
-      }
-
-      // If auto-confirmed
-      router.push("/shop");
+    if (
+      data.user &&
+      data.user.identities &&
+      data.user.identities.length === 0
+    ) {
+      errorMessage.value = "Questa email è già registrata. Accedi.";
+      return;
     }
+
+    // If email confirmation is required
+    if (data.user && !data.session) {
+      errorMessage.value = "Controlla la tua email per il link di conferma.";
+      return;
+    }
+
+    // Create profile record
+    if (data.user) {
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        first_name: formData.value.name,
+        last_name: "",
+      });
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
+      }
+    }
+
+    // If auto-confirmed
+    router.push("/shop");
   } catch (error) {
     errorMessage.value =
-      error.message || "An error occurred during authentication.";
+      error.message || "Si è verificato un errore durante la registrazione.";
     console.error("Authentication error:", error);
+  }
+};
+
+// Handle Google Sign Up
+const signUpWithGoogle = async () => {
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    errorMessage.value =
+      error.message || "Errore durante l'accesso con Google.";
+    console.error("Google auth error:", error);
   }
 };
 </script>
@@ -257,5 +287,14 @@ input {
 a {
   color: #6a5acd;
   text-decoration: none;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #d32f2f;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  font-size: 14px;
 }
 </style>
