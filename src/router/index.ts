@@ -32,6 +32,42 @@ const router = createRouter({
       name: "account",
       component: () => import("../views/Account.vue"),
     },
+
+    {
+      path: "/wishlist",
+      name: "wishlist",
+      component: () => import("../views/Wishlist.vue"),
+    },
+
+    {
+      path: "/cart",
+      name: "cart",
+      component: () => import("../views/Cart.vue"),
+    },
+
+    {
+      path: "/checkout",
+      name: "checkout",
+      component: () => import("../views/Checkout.vue"),
+    },
+
+    {
+      path: "/contact",
+      name: "contact",
+      component: () => import("../views/Contact.vue"),
+    },
+
+    {
+      path: "/error",
+      name: "error",
+      component: () => import("../views/Error.vue"),
+    },
+
+    {
+      path: "/product",
+      name: "product",
+      component: () => import("../views/Product.vue"),
+    },
   ],
 });
 
