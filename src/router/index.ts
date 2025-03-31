@@ -34,9 +34,9 @@ const router = createRouter({
     },
 
     {
-      path: "/wishlist",
+      path: "/whishlist",
       name: "wishlist",
-      component: () => import("../views/Wishlist.vue"),
+      component: () => import("../views/wishlist.vue"),
     },
 
     {
