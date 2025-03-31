@@ -25,13 +25,20 @@
     <div class="form-section">
       <h2>Accedi all'Account</h2>
       <p>Inserisci i tuoi dati</p>
-      <form>
+      <div
+        v-if="errorMessage"
+        class="error-message">
+        {{ errorMessage }}
+      </div>
+      <form @submit.prevent="submitForm">
         <input
           type="email"
+          v-model="email"
           placeholder="Email o Numero di Telefono"
           required />
         <input
           type="password"
+          v-model="password"
           placeholder="Password"
           required />
         <button
@@ -41,7 +48,9 @@
         </button>
       </form>
 
-      <button class="google-signup">
+      <button
+        class="google-signup"
+        @click="signInWithGoogle">
         <img
           src="../assets/Google.png"
           alt="Accedi con Google" />
@@ -134,6 +143,23 @@ const submitForm = async () => {
     errorMessage.value =
       error.message || "An error occurred during authentication.";
     console.error("Authentication error:", error);
+  }
+};
+
+// Handle Google Sign-In
+const signInWithGoogle = async () => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/shop",
+      },
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    errorMessage.value = error.message || "Errore durante l'accesso con Google";
+    console.error("Google authentication error:", error);
   }
 };
 </script>
@@ -264,5 +290,15 @@ a {
 
 .forgot-password-link:hover {
   text-decoration: underline;
+}
+
+.error-message {
+  color: #e74c3c;
+  background-color: #fdecea;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  font-size: 14px;
+  text-align: center;
 }
 </style>

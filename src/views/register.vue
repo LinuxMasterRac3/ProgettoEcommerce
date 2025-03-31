@@ -295,6 +295,8 @@ a {
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 15px;
+  margin-bottom: 15px;
+
   font-size: 14px;
 }
 </style>
