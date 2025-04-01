@@ -2,6 +2,8 @@
 import { ref, onMounted } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
+import Navbar from "../components/Navbar.vue";
+import Footer from "../components/footer.vue";
 
 // Type definitions for better type safety
 interface Book {
@@ -183,46 +185,8 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
-    <!-- Header/Navigation Bar -->
-    <header class="header">
-      <div class="logo">
-        <RouterLink to="/">
-          <h2>PiegaLibro</h2>
-        </RouterLink>
-      </div>
-      <nav class="nav-buttons">
-        <RouterLink
-          to="/cart"
-          class="nav-item cart-button"
-          title="Carrello">
-          <i class="fas fa-shopping-cart"></i>
-          <span class="nav-text">Carrello</span>
-        </RouterLink>
-
-        <RouterLink
-          to="/wishlist"
-          class="nav-item favorites-button"
-          title="Preferiti">
-          <i class="far fa-heart"></i>
-          <span class="nav-text">Preferiti</span>
-        </RouterLink>
-
-        <RouterLink
-          to="/addbook"
-          class="add-book-button">
-          <i class="fas fa-plus"></i>
-          <span>Aggiungi Libro</span>
-        </RouterLink>
-
-        <RouterLink
-          to="/account"
-          class="nav-item profile-icon"
-          title="Account">
-          <i class="fas fa-user-circle"></i>
-          <span class="nav-text">Account</span>
-        </RouterLink>
-      </nav>
-    </header>
+    <!-- Using imported Navbar component -->
+    <Navbar />
 
     <!-- Hero Banner / Slider -->
     <div class="hero-banner">
@@ -485,6 +449,9 @@ onMounted(() => {
         </div>
       </div>
     </section>
+
+    <!-- Adding footer component -->
+    <Footer />
   </div>
 </template>
 

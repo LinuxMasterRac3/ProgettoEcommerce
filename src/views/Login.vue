@@ -1,69 +1,65 @@
 <template>
-  <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0" />
-  <title>Accedi - PiegaLibro</title>
-  <link
-    rel="stylesheet"
-    href="styles.css" />
-  <header>
-    <h1>PiegaLibro</h1>
-    <nav>
-      <button class="add-book">Aggiungi Libro +</button>
-      <span class="icon">❤️</span>
-      <span class="icon">🛒</span>
-      <span class="icon">👤</span>
-    </nav>
-  </header>
-  <div class="container">
-    <div class="image-section">
-      <img
-        src="../assets/pexels-mikhail-nilov-9158370.jpg"
-        alt="Persona con libri" />
-    </div>
-    <div class="form-section">
-      <h2>Accedi all'Account</h2>
-      <p>Inserisci i tuoi dati</p>
-      <div
-        v-if="errorMessage"
-        class="error-message">
-        {{ errorMessage }}
+  <div class="login-page">
+    <Navbar />
+    <main>
+      <div class="container">
+        <div class="image-section">
+          <img
+            src="../assets/pexels-mikhail-nilov-9158370.jpg"
+            alt="Persona con libri" />
+        </div>
+
+        <div class="form-section">
+          <h2>Accedi all'Account</h2>
+          <p>Inserisci i tuoi dati</p>
+
+          <!-- Mostra messaggi di errore -->
+          <div
+            v-if="errorMessage"
+            class="error-message">
+            {{ errorMessage }}
+          </div>
+
+          <form @submit.prevent="submitForm">
+            <input
+              v-model="email"
+              type="text"
+              placeholder="Email o Numero di Telefono"
+              required />
+            <input
+              v-model="password"
+              type="password"
+              placeholder="Password"
+              required />
+            <button
+              type="submit"
+              class="create-account">
+              Accedi
+            </button>
+          </form>
+
+          <button
+            @click="signInWithGoogle"
+            class="google-signup">
+            <img
+              src="../assets/Google.png"
+              alt="Accedi con Google" />
+            Accedi con Google
+          </button>
+
+          <a
+            href="#"
+            class="forgot-password-link"
+            >Password dimenticata?</a
+          >
+          <p class="account-info">
+            Non hai un account?
+            <router-link to="/register">Registrati</router-link>
+          </p>
+        </div>
       </div>
-      <form @submit.prevent="submitForm">
-        <input
-          type="email"
-          v-model="email"
-          placeholder="Email o Numero di Telefono"
-          required />
-        <input
-          type="password"
-          v-model="password"
-          placeholder="Password"
-          required />
-        <button
-          type="submit"
-          class="create-account">
-          Accedi
-        </button>
-      </form>
-
-      <button
-        class="google-signup"
-        @click="signInWithGoogle">
-        <img
-          src="../assets/Google.png"
-          alt="Accedi con Google" />
-        Accedi con Google
-      </button>
-
-      <a
-        href="#"
-        class="forgot-password-link"
-        >Password dimenticata?</a
-      >
-      <p>Non hai un account? <a href="/Signup.html">Registrati</a></p>
-    </div>
+    </main>
+    <Footer />
   </div>
 </template>
 
@@ -71,7 +67,8 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
-
+import Navbar from "../components/Navbar.vue";
+import Footer from "../components/footer.vue";
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
 const supabaseKey =
@@ -163,7 +160,8 @@ const signInWithGoogle = async () => {
   }
 };
 </script>
-<style>
+
+<style scoped>
 * {
   margin: 0;
   padding: 0;
@@ -172,39 +170,10 @@ const signInWithGoogle = async () => {
 }
 
 body {
-  background-color: #f9f9f9;
+  background-color: white; /* Sfondo bianco */
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 20px;
-  background: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.add-book {
-  background: #d6c3f5;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.icon {
-  font-size: 18px;
-  cursor: pointer;
 }
 
 .container {
@@ -212,11 +181,18 @@ nav {
   justify-content: center;
   align-items: center;
   margin-top: 50px;
-  width: 80%;
+  width: 90%; /* Riduce la larghezza per centrare meglio il contenuto */
+}
+
+.image-section {
+  display: flex;
+  justify-content: flex-end; /* Sposta l'immagine verso destra */
+  align-items: center;
+  margin-right: 40px; /* Aggiunge spazio tra l'immagine e il form */
 }
 
 .image-section img {
-  width: 400px;
+  width: 400px; /* Mantiene la dimensione dell'immagine */
   border-radius: 10px;
 }
 
@@ -226,17 +202,19 @@ nav {
   border-radius: 10px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   margin-left: 20px;
-  width: 800px; /* Larghezza Aumentata */
-  box-sizing: border-box; /* Importante per includere padding e bordi */
+  width: 800px;
+  box-sizing: border-box;
 }
 
 h2 {
   font-size: 24px;
   margin-bottom: 10px;
+  color: black; /* Cambia il colore del testo in nero */
 }
 
 p {
   margin-bottom: 15px;
+  color: black; /* Cambia il colore del testo in nero */
 }
 
 input {
@@ -267,38 +245,46 @@ input {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-sizing: border-box;
+  margin-top: 15px;
 }
 
 .google-signup img {
   width: 20px;
   height: 20px;
+  margin-right: 10px;
 }
 
 a {
-  color: #6a5acd;
+  color: black; /* Cambia il colore dei link in nero */
   text-decoration: none;
 }
 
 .forgot-password-link {
-  display: inline-block;
-  margin-top: 10px;
-  color: #6a5acd;
+  display: block;
+  margin-top: 15px;
+  color: gray; /* Colore grigio per il link */
   text-decoration: none;
-  font-size: 0.9em;
+  font-size: 14px;
 }
 
-.forgot-password-link:hover {
-  text-decoration: underline;
+.account-info {
+  margin-top: 20px; /* Sposta la frase leggermente più in basso */
+  text-align: center;
+  color: gray; /* Cambia il colore della frase in grigio */
+}
+
+.account-info a {
+  color: black; /* Mantiene "Registrati" nero */
+  font-weight: bold;
+  text-decoration: none;
 }
 
 .error-message {
-  color: #e74c3c;
-  background-color: #fdecea;
+  background-color: #ffebee;
+  color: #d32f2f;
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 15px;
   font-size: 14px;
-  text-align: center;
 }
 </style>

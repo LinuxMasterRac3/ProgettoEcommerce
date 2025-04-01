@@ -1,15 +1,6 @@
 <template>
-  <div class="registration-page">
-    <header>
-      <h1>PiegaLibro</h1>
-      <nav>
-        <button class="add-book">Aggiungi Libro +</button>
-        <span class="icon">❤️</span>
-        <span class="icon">🛒</span>
-        <span class="icon">👤</span>
-      </nav>
-    </header>
-
+  <div class="page-container">
+    <Navbar />
     <main>
       <div class="container">
         <div class="image-section">
@@ -61,12 +52,13 @@
             Registrati con Google
           </button>
 
-          <p>
+          <p class="account-info">
             Hai già un account? <router-link to="/login">Accedi</router-link>
           </p>
         </div>
       </div>
     </main>
+    <Footer />
   </div>
 </template>
 
@@ -74,7 +66,8 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
-
+import Navbar from "../components/Navbar.vue";
+import Footer from "../components/footer.vue";
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
 const supabaseKey =
@@ -172,6 +165,16 @@ const signUpWithGoogle = async () => {
 </script>
 
 <style scoped>
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -180,39 +183,10 @@ const signUpWithGoogle = async () => {
 }
 
 body {
-  background-color: #f9f9f9;
+  background-color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 20px;
-  background: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.add-book {
-  background: #d6c3f5;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.icon {
-  font-size: 18px;
-  cursor: pointer;
 }
 
 .container {
@@ -220,7 +194,14 @@ nav {
   justify-content: center;
   align-items: center;
   margin-top: 50px;
-  width: 80%;
+  width: 90%;
+}
+
+.image-section {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-right: 40px;
 }
 
 .image-section img {
@@ -241,10 +222,12 @@ nav {
 h2 {
   font-size: 24px;
   margin-bottom: 10px;
+  color: black;
 }
 
 p {
   margin-bottom: 15px;
+  color: black;
 }
 
 input {
@@ -285,7 +268,19 @@ input {
 }
 
 a {
-  color: #6a5acd;
+  color: black;
+  text-decoration: none;
+}
+
+.account-info {
+  margin-top: 20px;
+  text-align: center;
+  color: gray;
+}
+
+.account-info a {
+  color: black;
+  font-weight: bold;
   text-decoration: none;
 }
 
@@ -295,8 +290,6 @@ a {
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 15px;
-  margin-bottom: 15px;
-
   font-size: 14px;
 }
 </style>
