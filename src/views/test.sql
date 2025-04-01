@@ -1,4 +1,4 @@
--- questo codice e presente su supabase NON IN LOCALE NEL PROGETTO DA USARE SOLO PER TEST 
+-- Attiva l'estensione uuid-ossp
 create extension if not exists "uuid-ossp";
 
 create table IF NOT EXISTS profiles (
@@ -29,18 +29,37 @@ create policy "Users can insert their own profile"
   on profiles for insert 
   with check (auth.uid() = id);
 
+DROP TABLE IF EXISTS products CASCADE;  -- Solo se necessario ricrearlo completamente
 create table IF NOT EXISTS products (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
   description text,
   price decimal not null,
   image_url text,
+  user_id uuid references auth.users, -- Aggiunta colonna user_id
+  metadata jsonb,                     -- Aggiunta colonna metadata per dettagli aggiuntivi
+  status text default 'active',       -- Aggiunta colonna status
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
 
 DROP POLICY IF EXISTS "Anyone can view products" ON products;
 create policy "Anyone can view products" on products for select using (true);
+
+DROP POLICY IF EXISTS "Users can add their own products" ON products;
+create policy "Users can add their own products" 
+  on products for insert 
+  with check (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own products" ON products;
+create policy "Users can update their own products" 
+  on products for update 
+  using (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own products" ON products;
+create policy "Users can delete their own products" 
+  on products for delete 
+  using (auth.uid() = user_id);
 
 create table IF NOT EXISTS addresses (
   id uuid default uuid_generate_v4() primary key,
@@ -84,6 +103,8 @@ create table IF NOT EXISTS order_items (
   unit_price decimal not null,
   created_at timestamp with time zone default now()
 );
+
+-- Policies per ordini
 DROP POLICY IF EXISTS "Users can view their own orders" ON orders;
 DROP POLICY IF EXISTS "Users can view their own order items" ON order_items;
 
@@ -91,6 +112,7 @@ create policy "Users can view their own orders" on orders for select using (auth
 create policy "Users can view their own order items" on order_items for select using (
   auth.uid() = (select user_id from orders where id = order_id)
 );
+
 create table IF NOT EXISTS favorites (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references auth.users not null,
@@ -98,12 +120,16 @@ create table IF NOT EXISTS favorites (
   created_at timestamp with time zone default now(),
   unique(user_id, product_id)
 );
+
+-- Policies per preferiti
 DROP POLICY IF EXISTS "Users can view their own favorites" ON favorites;
 DROP POLICY IF EXISTS "Users can insert their own favorites" ON favorites;
 DROP POLICY IF EXISTS "Users can delete their own favorites" ON favorites;
+
 create policy "Users can view their own favorites" on favorites for select using (auth.uid() = user_id);
 create policy "Users can insert their own favorites" on favorites for insert with check (auth.uid() = user_id);
 create policy "Users can delete their own favorites" on favorites for delete using (auth.uid() = user_id);
+
 create table IF NOT EXISTS reviews (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references auth.users not null,
@@ -114,10 +140,13 @@ create table IF NOT EXISTS reviews (
   updated_at timestamp with time zone default now(),
   unique(user_id, product_id)
 );
+
+-- Policies per recensioni
 DROP POLICY IF EXISTS "Anyone can view reviews" ON reviews;
 DROP POLICY IF EXISTS "Users can insert their own reviews" ON reviews;
 DROP POLICY IF EXISTS "Users can update their own reviews" ON reviews;
 DROP POLICY IF EXISTS "Users can delete their own reviews" ON reviews;
+
 create policy "Anyone can view reviews" on reviews for select using (true);
 create policy "Users can insert their own reviews" on reviews for insert with check (auth.uid() = user_id);
 create policy "Users can update their own reviews" on reviews for update using (auth.uid() = user_id);

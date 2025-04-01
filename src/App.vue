@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from "vue-router";
 import HelloWorld from "./components/HelloWorld.vue";
+// filepath: /Users/effe/Downloads/ProgettoEcommerce-main/src/main.js
+import "./assets/main.css";
 </script>
 
 <template>
@@ -11,4 +13,6 @@ import HelloWorld from "./components/HelloWorld.vue";
   <RouterView />
 </template>
 
-<style scoped></style>
+<style>
+@import "./assets/main.css";
+</style>
