@@ -68,6 +68,16 @@ const router = createRouter({
       name: "product",
       component: () => import("../views/Product.vue"),
     },
+    {
+      path: "/shop",
+      name: "shop",
+      component: () => import("../views/Shop.vue"),
+    },
+    {
+      path: "/addbook",
+      name: "addbook",
+      component: () => import("../views/AggiungiLibro.vue"),
+    },
   ],
 });
 

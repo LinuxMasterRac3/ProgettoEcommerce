@@ -1,6 +1,26 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { RouterLink } from "vue-router";
+import { ref, onMounted } from "vue";
+import { RouterLink, useRouter } from "vue-router";
+import { createClient } from "@supabase/supabase-js";
+
+// Type definitions for better type safety
+interface Book {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url?: string;
+  discountPercentage?: number;
+  rating?: number;
+  reviewCount?: number;
+}
+
+// Supabase configuration
+const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
+const supabaseKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpeWxmeXlmaXRxendzdGZ0enBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNjYyNDcsImV4cCI6MjA1Njc0MjI0N30.CvIx_vI-KGGcFlcZy66-DIC8Itk03Olw3lzEMhnJP_c";
+const supabase = createClient(supabaseUrl, supabaseKey);
+const router = useRouter();
 
 // Data for the page
 const searchData = ref({
@@ -9,17 +29,156 @@ const searchData = ref({
   location: "",
 });
 
-// You can add methods here directly
+// Books data
+const recentBooks = ref<Book[]>([]);
+const isLoading = ref(true);
+const error = ref<string | null>(null);
+
+// Search functionality
 const searchProducts = () => {
   // Search functionality implementation
   console.log("Searching with:", searchData.value);
 };
 
-// For Font Awesome you have two options:
-// 1. Add Font Awesome CDN to index.html:
-//    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-// 2. Install and import the packages:
-//    npm install @fortawesome/fontawesome-svg-core @fortawesome/free-solid-svg-icons @fortawesome/free-regular-svg-icons @fortawesome/vue-fontawesome
+// Fetch recent books from the database
+const fetchRecentBooks = async () => {
+  isLoading.value = true;
+  error.value = null;
+
+  try {
+    // Query to get the most recently added books
+    const { data, error: fetchError } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (fetchError) throw fetchError;
+
+    // Properly type cast and handle empty results
+    if (data) {
+      recentBooks.value = data.map((item) => ({
+        id: item.id,
+        name: item.name || "Titolo non disponibile",
+        description: item.description || "Descrizione non disponibile",
+        price: parseFloat(item.price) || 0,
+        image_url: item.image_url,
+        discountPercentage: item.discount_percentage,
+        rating: item.rating,
+        reviewCount: item.review_count,
+      }));
+    } else {
+      recentBooks.value = [];
+    }
+  } catch (err) {
+    console.error("Error fetching books:", err);
+    error.value = "Impossibile caricare i libri recenti. Riprova più tardi.";
+
+    // Provide placeholder data in development
+    recentBooks.value = getPlaceholderBooks();
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Function to get placeholder books for development
+const getPlaceholderBooks = (): Book[] => {
+  return [
+    {
+      id: "1",
+      name: "Harry Potter e la Pietra Filosofale",
+      description: "Il primo libro della saga di Harry Potter",
+      price: 15.99,
+      image_url: "https://placehold.co/300x200?text=Harry+Potter",
+      discountPercentage: 10,
+      rating: 4.8,
+      reviewCount: 123,
+    },
+    {
+      id: "2",
+      name: "Il Signore degli Anelli",
+      description: "La storia epica di Frodo e dell'anello",
+      price: 25.99,
+      image_url: "https://placehold.co/300x200?text=Il+Signore+degli+Anelli",
+      discountPercentage: 0,
+      rating: 4.9,
+      reviewCount: 256,
+    },
+    {
+      id: "3",
+      name: "IT",
+      description: "Il terrificante romanzo di Stephen King",
+      price: 19.5,
+      image_url: "https://placehold.co/300x200?text=IT",
+      discountPercentage: 15,
+      rating: 4.6,
+      reviewCount: 98,
+    },
+    {
+      id: "4",
+      name: "Diario di una Schiappa",
+      description: "Le avventure di Greg Heffley",
+      price: 12.9,
+      image_url: "https://placehold.co/300x200?text=Diario+di+una+Schiappa",
+      discountPercentage: 5,
+      rating: 4.3,
+      reviewCount: 87,
+    },
+    {
+      id: "5",
+      name: "Norwegian Wood",
+      description: "Un romanzo di Haruki Murakami",
+      price: 18.5,
+      image_url: "https://placehold.co/300x200?text=Norwegian+Wood",
+      discountPercentage: 0,
+      rating: 4.7,
+      reviewCount: 64,
+    },
+  ];
+};
+
+// Calculate discounted price safely
+const calculateDiscountedPrice = (book: Book): string => {
+  try {
+    if (!book.price) return "0.00";
+
+    if (book.discountPercentage && book.discountPercentage > 0) {
+      const discounted = book.price * (1 - book.discountPercentage / 100);
+      return discounted.toFixed(2);
+    } else {
+      return book.price.toFixed(2);
+    }
+  } catch (err) {
+    console.error("Error calculating price:", err);
+    return "0.00";
+  }
+};
+
+// Favorite/Wishlist functionality
+const toggleFavorite = async (bookId: string) => {
+  try {
+    console.log("Toggle favorite for book ID:", bookId);
+    // Add your wishlist toggle functionality here
+    // Example:
+    // const { data, error } = await supabase.from('favorites').upsert({
+    //   user_id: userId,
+    //   product_id: bookId,
+    //   created_at: new Date()
+    // });
+  } catch (err) {
+    console.error("Error toggling favorite:", err);
+  }
+};
+
+// Navigate to product detail page
+const viewProductDetails = (bookId: string) => {
+  router.push(`/product/${bookId}`);
+};
+
+// Fetch books when component is mounted
+onMounted(() => {
+  fetchRecentBooks();
+});
 </script>
 
 <template>
@@ -48,10 +207,12 @@ const searchProducts = () => {
           <span class="nav-text">Preferiti</span>
         </RouterLink>
 
-        <button class="add-book-button">
+        <RouterLink
+          to="/addbook"
+          class="add-book-button">
           <i class="fas fa-plus"></i>
           <span>Aggiungi Libro</span>
-        </button>
+        </RouterLink>
 
         <RouterLink
           to="/account"
@@ -103,137 +264,109 @@ const searchProducts = () => {
       </div>
     </div>
 
-    <!-- Product Recommendations Section -->
+    <!-- Recent Books Section -->
     <section class="product-section">
       <div class="section-header">
         <div class="category-indicator">
           <span class="category-icon"></span>
-          <span>Categories</span>
+          <span>Libri</span>
         </div>
-        <h2 class="section-title">Potrebbe Piacerti</h2>
+        <h2 class="section-title">Aggiunti di Recente</h2>
       </div>
 
-      <div class="product-grid">
-        <!-- Product Card 1 -->
-        <div class="product-card">
-          <div class="product-image">
-            <div class="discount-tag">-35%</div>
-            <button class="favorite-button">
+      <!-- Loading state -->
+      <div
+        v-if="isLoading"
+        class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Caricamento libri...</p>
+      </div>
+
+      <!-- Error state -->
+      <div
+        v-else-if="error"
+        class="error-container">
+        <p>{{ error }}</p>
+        <button
+          @click="fetchRecentBooks"
+          class="retry-button">
+          Riprova
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        v-else-if="recentBooks.length === 0"
+        class="empty-container">
+        <p>Non ci sono ancora libri disponibili.</p>
+        <RouterLink
+          to="/addbook"
+          class="add-first-book-button">
+          Aggiungi il primo libro!
+        </RouterLink>
+      </div>
+
+      <!-- Books grid -->
+      <div
+        v-else
+        class="product-grid">
+        <div
+          v-for="book in recentBooks"
+          :key="book.id"
+          class="product-card">
+          <div
+            class="product-image"
+            :style="
+              book.image_url
+                ? `background-image: url(${book.image_url}); background-size: cover;`
+                : ''
+            ">
+            <div
+              v-if="book.discountPercentage && book.discountPercentage > 0"
+              class="discount-tag">
+              -{{ book.discountPercentage }}%
+            </div>
+            <button
+              class="favorite-button"
+              @click="toggleFavorite(book.id)">
               <i class="far fa-heart"></i>
             </button>
-            <button class="view-button">
+            <button
+              class="view-button"
+              @click="viewProductDetails(book.id)">
               <i class="far fa-eye"></i>
             </button>
           </div>
           <div class="product-details">
-            <h3 class="product-title">HAVIT HV-G92 Gamepad</h3>
+            <h3 class="product-title">{{ book.name }}</h3>
             <div class="product-price">
-              <span class="current-price">$120</span>
-              <span class="original-price">$160</span>
+              <span class="current-price"
+                >€{{ calculateDiscountedPrice(book) }}</span
+              >
+              <span
+                v-if="book.discountPercentage && book.discountPercentage > 0"
+                class="original-price">
+                €{{ book.price ? book.price.toFixed(2) : "0.00" }}
+              </span>
             </div>
-            <div class="rating">
+            <div
+              class="rating"
+              v-if="book.rating">
               <span class="stars">★★★★★</span>
-              <span class="review-count">(88)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Product Card 2 -->
-        <div class="product-card">
-          <div class="product-image">
-            <div class="discount-tag">-35%</div>
-            <button class="favorite-button">
-              <i class="far fa-heart"></i>
-            </button>
-            <button class="view-button">
-              <i class="far fa-eye"></i>
-            </button>
-            <div class="add-to-cart-overlay">
-              <button class="add-to-cart-button">Add To Cart</button>
-            </div>
-          </div>
-          <div class="product-details">
-            <h3 class="product-title">AK-900 Wired Keyboard</h3>
-            <div class="product-price">
-              <span class="current-price">$960</span>
-              <span class="original-price">$1160</span>
-            </div>
-            <div class="rating">
-              <span class="stars">★★★★★</span>
-              <span class="review-count">(75)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Product Card 3 -->
-        <div class="product-card">
-          <div class="product-image">
-            <div class="discount-tag">-35%</div>
-            <button class="favorite-button">
-              <i class="far fa-heart"></i>
-            </button>
-            <button class="view-button">
-              <i class="far fa-eye"></i>
-            </button>
-          </div>
-          <div class="product-details">
-            <h3 class="product-title">IPS LCD Gaming Monitor</h3>
-            <div class="product-price">
-              <span class="current-price">$370</span>
-              <span class="original-price">$400</span>
-            </div>
-            <div class="rating">
-              <span class="stars">★★★★★</span>
-              <span class="review-count">(99)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Product Card 4 -->
-        <div class="product-card">
-          <div class="product-image">
-            <div class="discount-tag">-35%</div>
-            <button class="favorite-button">
-              <i class="far fa-heart"></i>
-            </button>
-            <button class="view-button">
-              <i class="far fa-eye"></i>
-            </button>
-          </div>
-          <div class="product-details">
-            <h3 class="product-title">S-Series Comfort Chair</h3>
-            <div class="product-price">
-              <span class="current-price">$375</span>
-              <span class="original-price">$400</span>
-            </div>
-            <div class="rating">
-              <span class="stars">★★★★★</span>
-              <span class="review-count">(99)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Product Card 5 -->
-        <div class="product-card">
-          <div class="product-image">
-            <div class="discount-tag">-35%</div>
-          </div>
-          <div class="product-details">
-            <h3 class="product-title">S-Series Comfort Chair</h3>
-            <div class="product-price">
-              <span class="current-price">$375</span>
-              <span class="original-price">$400</span>
-            </div>
-            <div class="rating">
-              <span class="stars">★★★★★</span>
-              <span class="review-count">(99)</span>
+              <span class="review-count">({{ book.reviewCount || 0 }})</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="view-all-container">
-        <button class="view-all-button">View All Products</button>
+      <div
+        v-if="recentBooks.length > 0"
+        class="view-all-container">
+        <RouterLink
+          to="/shop"
+          class="view-all-button">
+          Vedi Tutti i Libri
+        </RouterLink>
       </div>
     </section>
 
@@ -362,6 +495,7 @@ const searchProducts = () => {
   padding: 0;
   box-sizing: border-box;
   font-family: "Inter", sans-serif;
+  color: #333; /* Colore base per tutti i testi */
 }
 
 .app-container {
@@ -385,7 +519,7 @@ const searchProducts = () => {
 
 .logo h2 {
   font-weight: 600;
-  color: #333;
+  color: #222; /* Più scuro per migliorare il contrasto */
   transition: color 0.3s;
 }
 
@@ -432,7 +566,7 @@ nav.nav-buttons {
   align-items: center;
   gap: 5px;
   background-color: #6a5acd;
-  color: white;
+  color: black; /* Cambiato da white a black */
   padding: 8px 15px;
   border: none;
   border-radius: 20px;
@@ -464,7 +598,7 @@ nav.nav-buttons {
 }
 
 .slider-content {
-  color: #a5b0d6;
+  color: #394263; /* Molto più scuro rispetto al precedente #a5b0d6 */
 }
 
 .slider-title {
@@ -495,6 +629,7 @@ nav.nav-buttons {
 .search-field label {
   margin-bottom: 8px;
   font-weight: 500;
+  color: #222; /* Più scuro per le etichette */
 }
 
 .search-field input {
@@ -506,7 +641,7 @@ nav.nav-buttons {
 
 .search-button {
   background-color: #7b68ee;
-  color: white;
+  color: black; /* Cambiato da white a black */
   border: none;
   border-radius: 8px;
   width: 40px;
@@ -537,9 +672,14 @@ nav.nav-buttons {
   margin-right: 8px;
 }
 
+.category-indicator span {
+  color: #333; /* Esplicitamente scuro per il testo dell'indicatore */
+}
+
 .section-title {
   font-size: 22px;
   font-weight: 600;
+  color: #222; /* Più scuro per i titoli delle sezioni */
 }
 
 .navigation-arrows {
@@ -579,6 +719,9 @@ nav.nav-buttons {
   height: 160px;
   background-color: #f5f5f5;
   position: relative;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .discount-tag {
@@ -592,28 +735,38 @@ nav.nav-buttons {
   font-size: 12px;
 }
 
-.favorite-button,
-.view-button {
+.favorite-button {
   position: absolute;
+  top: 10px;
+  right: 10px;
   width: 30px;
   height: 30px;
   border-radius: 50%;
   background-color: white;
-  border: none;
+  color: #333;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-}
-
-.favorite-button {
-  top: 10px;
-  right: 10px;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .view-button {
-  bottom: 10px;
-  right: 10px;
+  position: absolute;
+  top: 10px;
+  right: 50px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: white;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .add-to-cart-overlay {
@@ -629,7 +782,7 @@ nav.nav-buttons {
 .add-to-cart-button {
   background: none;
   border: none;
-  color: white;
+  color: white; /* Mantenuto bianco perché lo sfondo è nero */
   font-weight: 500;
   cursor: pointer;
 }
@@ -642,6 +795,7 @@ nav.nav-buttons {
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 5px;
+  color: #222; /* Più scuro per i titoli dei prodotti */
 }
 
 .product-price {
@@ -679,8 +833,10 @@ nav.nav-buttons {
 }
 
 .view-all-button {
+  display: inline-block;
+  text-decoration: none;
   background-color: #db4444;
-  color: white;
+  color: black;
   border: none;
   padding: 12px 30px;
   border-radius: 4px;
@@ -707,23 +863,31 @@ nav.nav-buttons {
   border-radius: 4px;
   padding: 25px 0;
   cursor: pointer;
+  color: #333; /* Esplicitamente scuro per il testo delle card */
 }
 
 .category-card.active,
 .publisher-card.active {
   background-color: #2b3238;
-  color: white;
+  color: white; /* Mantenuto bianco qui perché lo sfondo è scuro */
 }
 
 .category-icon,
 .publisher-icon {
   font-size: 24px;
   margin-bottom: 15px;
+  color: #333; /* Esplicitamente scuro per le icone */
+}
+
+.category-card.active .category-icon,
+.publisher-card.active .publisher-icon {
+  color: white; /* Mantenuto bianco qui perché lo sfondo è scuro */
 }
 
 .category-name,
 .publisher-name {
   font-size: 14px;
+  font-weight: 500; /* Aggiunto peso del font per migliorare leggibilità */
 }
 
 /* Responsive Styles */
@@ -767,5 +931,64 @@ nav.nav-buttons {
   .publisher-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Additional styles for new components */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #6a5acd;
+  animation: spin 1s infinite ease-in-out;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px 0;
+  background-color: #fff3f3;
+  border-radius: 8px;
+}
+
+.retry-button {
+  margin-top: 15px;
+  background-color: #6a5acd;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.empty-container {
+  text-align: center;
+  padding: 40px 0;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.add-first-book-button {
+  display: inline-block;
+  margin-top: 15px;
+  background-color: #6a5acd;
+  color: white;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 4px;
 }
 </style>
