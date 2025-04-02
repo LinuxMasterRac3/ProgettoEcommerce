@@ -172,6 +172,26 @@ const toggleFavorite = async (bookId: string) => {
   }
 };
 
+// Funzione per aggiungere al carrello
+const addToCart = async (bookId: string, event: Event) => {
+  // Ferma la propagazione dell'evento per evitare navigazione
+  event.stopPropagation();
+
+  try {
+    console.log("Adding to cart book ID:", bookId);
+    // Implementa qui la logica per aggiungere al carrello
+    // Esempio:
+    // const { data, error } = await supabase.from('cart').insert({
+    //   user_id: currentUserId,
+    //   product_id: bookId,
+    //   quantity: 1,
+    //   created_at: new Date()
+    // });
+  } catch (err) {
+    console.error("Error adding to cart:", err);
+  }
+};
+
 // Navigate to product detail page
 const viewProductDetails = (bookId: string) => {
   router.push(`/product/${bookId}`);
@@ -284,24 +304,31 @@ onMounted(() => {
               book.image_url
                 ? `background-image: url(${book.image_url}); background-size: cover;`
                 : ''
-            ">
+            "
+            @click="viewProductDetails(book.id)">
             <div
               v-if="book.discountPercentage && book.discountPercentage > 0"
               class="discount-tag">
               -{{ book.discountPercentage }}%
             </div>
-            <button
-              class="favorite-button"
-              @click="toggleFavorite(book.id)">
-              <i class="far fa-heart"></i>
-            </button>
-            <button
-              class="view-button"
-              @click="viewProductDetails(book.id)">
-              <i class="far fa-eye"></i>
-            </button>
+            <div class="product-actions">
+              <button
+                class="action-button favorite-button"
+                @click.stop="toggleFavorite(book.id)"
+                title="Aggiungi ai preferiti">
+                <i class="fas fa-heart"></i>
+              </button>
+              <button
+                class="action-button cart-button"
+                @click.stop="addToCart(book.id, $event)"
+                title="Aggiungi al carrello">
+                <i class="fas fa-shopping-cart"></i>
+              </button>
+            </div>
           </div>
-          <div class="product-details">
+          <div
+            class="product-details"
+            @click="viewProductDetails(book.id)">
             <h3 class="product-title">{{ book.name }}</h3>
             <div class="product-price">
               <span class="current-price"
@@ -680,6 +707,14 @@ nav.nav-buttons {
 .product-card {
   border-radius: 8px;
   overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #eee;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
 .product-image {
@@ -689,69 +724,59 @@ nav.nav-buttons {
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.discount-tag {
+/* Nascondi i pulsanti di default e mostrali solo all'hover */
+.product-actions {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  background-color: #db4444;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  display: flex;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
+.product-card:hover .product-actions {
+  opacity: 1;
+}
+
+.action-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: white;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+}
+
+.favorite-button:hover {
+  background-color: #ffebee;
+  color: #e91e63;
+}
+
+.cart-button:hover {
+  background-color: #e3f2fd;
+  color: #2196f3;
+}
+
+/* Rimuoviamo gli stili dei vecchi bottoni che non usiamo più */
+.view-button,
 .favorite-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: white;
-  color: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.view-button {
-  position: absolute;
-  top: 10px;
-  right: 50px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: white;
-  color: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.add-to-cart-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: black;
-  padding: 10px;
-  text-align: center;
-}
-
-.add-to-cart-button {
-  background: none;
-  border: none;
-  color: white; /* Mantenuto bianco perché lo sfondo è nero */
-  font-weight: 500;
-  cursor: pointer;
+  position: initial;
+  top: initial;
+  right: initial;
 }
 
 .product-details {
