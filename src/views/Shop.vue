@@ -718,33 +718,41 @@ nav.nav-buttons {
 }
 
 .product-image {
-  height: 160px;
-  background-color: #f5f5f5;
   position: relative;
+  width: 100%;
+  padding-bottom: 141%; /* Rapporto 9:16 (9/16 = 0.5625, 1/0.5625 = 1.7778) */
+  background-color: #f5f5f5;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* Nascondi i pulsanti di default e mostrali solo all'hover */
+.discount-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: #db4444;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1;
+}
+
+/* Posizionamento dei pulsanti in alto a destra */
 .product-actions {
   position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
-  gap: 10px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.product-card:hover .product-actions {
-  opacity: 1;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2;
 }
 
 .action-button {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background-color: white;
   color: #333;
@@ -761,6 +769,10 @@ nav.nav-buttons {
   transform: scale(1.1);
 }
 
+.action-button i {
+  font-size: 16px;
+}
+
 .favorite-button:hover {
   background-color: #ffebee;
   color: #e91e63;
@@ -771,16 +783,9 @@ nav.nav-buttons {
   color: #2196f3;
 }
 
-/* Rimuoviamo gli stili dei vecchi bottoni che non usiamo più */
-.view-button,
-.favorite-button {
-  position: initial;
-  top: initial;
-  right: initial;
-}
-
 .product-details {
-  padding: 10px 0;
+  padding: 12px;
+  background-color: white;
 }
 
 .product-title {
