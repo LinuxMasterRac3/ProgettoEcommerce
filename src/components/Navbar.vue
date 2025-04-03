@@ -1,58 +1,46 @@
 <template>
-  <header class="navbar-container">
-    <div class="navbar-content">
+  <header>
+    <RouterLink
+      to="/shop"
+      class="logo">
+      <h1>PiegaLibro</h1>
+    </RouterLink>
+    <nav>
       <RouterLink
-        to="/shop"
-        class="logo">
-        <h1>PiegaLibro</h1>
-      </RouterLink>
-      <nav>
-        <RouterLink
-          to="/addbook"
-          class="add-book"
-          >Aggiungi Libro +</RouterLink
-        >
-        <RouterLink
-          to="/favorites"
-          class="icon"
-          >❤️</RouterLink
-        >
-        <RouterLink
-          to="/cart"
-          class="icon"
-          >🛒</RouterLink
-        >
-        <RouterLink
-          to="/account"
-          class="icon"
-          >👤</RouterLink
-        >
-      </nav>
-    </div>
+        to="/addbook"
+        class="add-book"
+        >Aggiungi Libro +</RouterLink
+      >
+      <RouterLink
+        to="/favorites"
+        class="icon"
+        >❤️</RouterLink
+      >
+      <RouterLink
+        to="/cart"
+        class="icon"
+        >🛒</RouterLink
+      >
+      <RouterLink
+        to="/account"
+        class="icon"
+        >👤</RouterLink
+      >
+    </nav>
   </header>
 </template>
 
 <script setup></script>
 
 <style scoped>
-.navbar-container {
+header {
   width: 100%;
-  background: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-}
-
-.navbar-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 20px;
+  background: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 header h1 {
