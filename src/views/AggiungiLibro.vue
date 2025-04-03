@@ -1,17 +1,7 @@
 <template>
   <div class="add-book-container">
     <header>
-      <h1>PiegaLibro</h1>
-      <nav>
-        <RouterLink
-          to="/shop"
-          class="nav-link"
-          >Torna allo Shop</RouterLink
-        >
-        <span class="icon">❤️</span>
-        <span class="icon">🛒</span>
-        <span class="icon">👤</span>
-      </nav>
+      <Navbar />
     </header>
 
     <div class="page-title">
@@ -121,6 +111,24 @@
                 <option value="scifi">Fantascienza</option>
                 <option value="manga">Manga</option>
                 <option value="bambini">Libri per Bambini</option>
+                <option value="narrativa">Narrativa</option>
+                <option value="thriller">Thriller</option>
+                <option value="storico">Romanzo Storico</option>
+                <option value="distopico">Distopico</option>
+                <option value="poesia">Poesia</option>
+                <option value="fumetti">Fumetti</option>
+                <option value="religione">Religione</option>
+                <option value="filosofia">Filosofia</option>
+                <option value="cucina">Cucina</option>
+                <option value="arte">Arte</option>
+                <option value="musica">Musica</option>
+                <option value="viaggi">Viaggi</option>
+                <option value="sport">Sport</option>
+                <option value="economia">Economia</option>
+                <option value="psicologia">Psicologia</option>
+                <option value="storia">Storia</option>
+                <option value="scienza">Scienza</option>
+                <option value="tecnologia">Tecnologia</option>
                 <option value="altro">Altro</option>
               </select>
             </div>
@@ -145,6 +153,32 @@
                 <option value="starcomics">Star Comics</option>
                 <option value="panini">Panini Comics</option>
                 <option value="ipperboria">Ipperboria</option>
+                <option value="rizzoli">Rizzoli</option>
+                <option value="laterza">Laterza</option>
+                <option value="sperling">Sperling & Kupfer</option>
+                <option value="newton">Newton Compton</option>
+                <option value="longanesi">Longanesi</option>
+                <option value="piemme">Piemme</option>
+                <option value="sellerio">Sellerio</option>
+                <option value="hoepli">Hoepli</option>
+                <option value="zanichelli">Zanichelli</option>
+                <option value="corbaccio">Corbaccio</option>
+                <option value="fazi">Fazi Editore</option>
+                <option value="marsilio">Marsilio</option>
+                <option value="salani">Salani</option>
+                <option value="bollati">Bollati Boringhieri</option>
+                <option value="marcos">Marcos y Marcos</option>
+                <option value="minimum">minimum fax</option>
+                <option value="neri">Neri Pozza</option>
+                <option value="sei">SEI Editore</option>
+                <option value="mursia">Mursia</option>
+                <option value="utet">UTET</option>
+                <option value="nottetempo">nottetempo</option>
+                <option value="edagricole">Edagricole</option>
+                <option value="bao">BAO Publishing</option>
+                <option value="coconino">Coconino Press</option>
+                <option value="jPop">J-POP Manga</option>
+                <option value="tunue">Tunué</option>
                 <option value="altro">Altro</option>
               </select>
             </div>
@@ -328,6 +362,7 @@
         </button>
       </div>
     </div>
+    <Footer />
   </div>
 </template>
 
@@ -336,6 +371,8 @@ import { ref, reactive, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { RouterLink } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
+import Navbar from "../components/Navbar.vue";
+import Footer from "../components/footer.vue";
 
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
@@ -1268,5 +1305,29 @@ textarea:focus {
   .submit-button {
     width: 100%;
   }
+}
+
+/* Styles to ensure all text is black for better visibility */
+.add-book-container,
+.add-book-container input,
+.add-book-container textarea,
+.add-book-container select,
+.add-book-container button,
+.add-book-container label,
+.add-book-container p,
+.add-book-container h2,
+.add-book-container h3,
+.add-book-container option {
+  color: #000000;
+}
+
+.add-book-container select option {
+  color: #000000;
+  background-color: #ffffff;
+}
+
+.submit-button,
+.login-button {
+  color: white !important;
 }
 </style>

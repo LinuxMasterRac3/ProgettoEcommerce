@@ -1,5 +1,5 @@
 <template>
-  <footer>
+  <footer class="footer-container">
     <div class="footer-content">
       <div class="about">
         <h2>PiegaLibro</h2>
@@ -34,32 +34,19 @@
 <script setup></script>
 
 <style scoped>
-header {
+.footer-container {
   width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: bottom;
-  padding: 20px;
-  background: rgb(0, 0, 0);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-header h1 {
-  color: black;
-  margin: 0;
-  font-size: 24px;
-}
-
-footer {
-  width: 100%;
-  background: #222;
+  background-color: #333;
   color: #fff;
   padding: 20px 0;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
-  margin-top: 40px; /* Aggiunto margine superiore per staccare il footer */
+  margin-top: 50px;
+  left: 0;
+  right: 0;
 }
 
 .footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
   justify-content: space-between;
   padding: 0 20px;
@@ -123,5 +110,8 @@ footer {
   margin-top: 20px;
   font-size: 14px;
   color: #aaa;
+  padding: 0 20px;
+  max-width: 1200px;
+  margin: 20px auto 0;
 }
 </style>

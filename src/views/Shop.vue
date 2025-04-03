@@ -204,278 +204,286 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app-container">
+  <div class="page-wrapper">
     <!-- Using imported Navbar component -->
     <Navbar />
 
-    <!-- Hero Banner / Slider -->
-    <div class="hero-banner">
-      <div class="slider-content">
-        <h2 class="slider-title">Sara uno slider</h2>
-        <p class="slider-description">Inserire immagine trend del sito</p>
-      </div>
-    </div>
-
-    <!-- Search Section -->
-    <div class="search-section">
-      <div class="search-container">
-        <div class="search-field">
-          <label>Cosa cerchi ?</label>
-          <input
-            v-model="searchData.query"
-            type="text"
-            placeholder="Nome libro" />
+    <main>
+      <div class="content-container">
+        <!-- Hero Banner / Slider -->
+        <div class="hero-banner">
+          <div class="slider-content">
+            <h2 class="slider-title">Sara uno slider</h2>
+            <p class="slider-description">Inserire immagine trend del sito</p>
+          </div>
         </div>
-        <div class="search-field">
-          <label>Categoria</label>
-          <input
-            v-model="searchData.category"
-            type="text"
-            placeholder="Categoria" />
+
+        <!-- Search Section -->
+        <div class="search-section">
+          <div class="search-container">
+            <div class="search-field">
+              <label>Cosa cerchi ?</label>
+              <input
+                v-model="searchData.query"
+                type="text"
+                placeholder="Nome libro" />
+            </div>
+            <div class="search-field">
+              <label>Categoria</label>
+              <input
+                v-model="searchData.category"
+                type="text"
+                placeholder="Categoria" />
+            </div>
+            <div class="search-field">
+              <label>Dove ?</label>
+              <input
+                v-model="searchData.location"
+                type="text"
+                placeholder="Località" />
+            </div>
+            <button
+              class="search-button"
+              @click="searchProducts">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
         </div>
-        <div class="search-field">
-          <label>Dove ?</label>
-          <input
-            v-model="searchData.location"
-            type="text"
-            placeholder="Località" />
-        </div>
-        <button
-          class="search-button"
-          @click="searchProducts">
-          <i class="fas fa-search"></i>
-        </button>
-      </div>
-    </div>
 
-    <!-- Recent Books Section -->
-    <section class="product-section">
-      <div class="section-header">
-        <div class="category-indicator">
-          <span class="category-icon"></span>
-          <span>Libri</span>
-        </div>
-        <h2 class="section-title">Aggiunti di Recente</h2>
-      </div>
+        <!-- Recent Books Section -->
+        <section class="product-section">
+          <div class="section-header">
+            <div class="category-indicator">
+              <span class="category-icon"></span>
+              <span>Libri</span>
+            </div>
+            <h2 class="section-title">Aggiunti di Recente</h2>
+          </div>
 
-      <!-- Loading state -->
-      <div
-        v-if="isLoading"
-        class="loading-container">
-        <div class="loading-spinner"></div>
-        <p>Caricamento libri...</p>
-      </div>
-
-      <!-- Error state -->
-      <div
-        v-else-if="error"
-        class="error-container">
-        <p>{{ error }}</p>
-        <button
-          @click="fetchRecentBooks"
-          class="retry-button">
-          Riprova
-        </button>
-      </div>
-
-      <!-- Empty state -->
-      <div
-        v-else-if="recentBooks.length === 0"
-        class="empty-container">
-        <p>Non ci sono ancora libri disponibili.</p>
-        <RouterLink
-          to="/addbook"
-          class="add-first-book-button">
-          Aggiungi il primo libro!
-        </RouterLink>
-      </div>
-
-      <!-- Books grid -->
-      <div
-        v-else
-        class="product-grid">
-        <div
-          v-for="book in recentBooks"
-          :key="book.id"
-          class="product-card">
+          <!-- Loading state -->
           <div
-            class="product-image"
-            :style="
-              book.image_url
-                ? `background-image: url(${book.image_url}); background-size: cover;`
-                : ''
-            "
-            @click="viewProductDetails(book.id)">
-            <div
-              v-if="book.discountPercentage && book.discountPercentage > 0"
-              class="discount-tag">
-              -{{ book.discountPercentage }}%
-            </div>
-            <div class="product-actions">
-              <button
-                class="action-button favorite-button"
-                @click.stop="toggleFavorite(book.id)"
-                title="Aggiungi ai preferiti">
-                <i class="fas fa-heart"></i>
-              </button>
-              <button
-                class="action-button cart-button"
-                @click.stop="addToCart(book.id, $event)"
-                title="Aggiungi al carrello">
-                <i class="fas fa-shopping-cart"></i>
-              </button>
-            </div>
+            v-if="isLoading"
+            class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Caricamento libri...</p>
           </div>
+
+          <!-- Error state -->
           <div
-            class="product-details"
-            @click="viewProductDetails(book.id)">
-            <h3 class="product-title">{{ book.name }}</h3>
-            <div class="product-price">
-              <span class="current-price"
-                >€{{ calculateDiscountedPrice(book) }}</span
-              >
-              <span
-                v-if="book.discountPercentage && book.discountPercentage > 0"
-                class="original-price">
-                €{{ book.price ? book.price.toFixed(2) : "0.00" }}
-              </span>
-            </div>
+            v-else-if="error"
+            class="error-container">
+            <p>{{ error }}</p>
+            <button
+              @click="fetchRecentBooks"
+              class="retry-button">
+              Riprova
+            </button>
+          </div>
+
+          <!-- Empty state -->
+          <div
+            v-else-if="recentBooks.length === 0"
+            class="empty-container">
+            <p>Non ci sono ancora libri disponibili.</p>
+            <RouterLink
+              to="/addbook"
+              class="add-first-book-button">
+              Aggiungi il primo libro!
+            </RouterLink>
+          </div>
+
+          <!-- Books grid -->
+          <div
+            v-else
+            class="product-grid">
             <div
-              class="rating"
-              v-if="book.rating">
-              <span class="stars">★★★★★</span>
-              <span class="review-count">({{ book.reviewCount || 0 }})</span>
+              v-for="book in recentBooks"
+              :key="book.id"
+              class="product-card">
+              <div
+                class="product-image"
+                :style="
+                  book.image_url
+                    ? `background-image: url(${book.image_url}); background-size: cover;`
+                    : ''
+                "
+                @click="viewProductDetails(book.id)">
+                <div
+                  v-if="book.discountPercentage && book.discountPercentage > 0"
+                  class="discount-tag">
+                  -{{ book.discountPercentage }}%
+                </div>
+                <div class="product-actions">
+                  <button
+                    class="action-button favorite-button"
+                    @click.stop="toggleFavorite(book.id)"
+                    title="Aggiungi ai preferiti">
+                    <i class="fas fa-heart"></i>
+                  </button>
+                  <button
+                    class="action-button cart-button"
+                    @click.stop="addToCart(book.id, $event)"
+                    title="Aggiungi al carrello">
+                    <i class="fas fa-shopping-cart"></i>
+                  </button>
+                </div>
+              </div>
+              <div
+                class="product-details"
+                @click="viewProductDetails(book.id)">
+                <h3 class="product-title">{{ book.name }}</h3>
+                <div class="product-price">
+                  <span class="current-price"
+                    >€{{ calculateDiscountedPrice(book) }}</span
+                  >
+                  <span
+                    v-if="
+                      book.discountPercentage && book.discountPercentage > 0
+                    "
+                    class="original-price">
+                    €{{ book.price ? book.price.toFixed(2) : "0.00" }}
+                  </span>
+                </div>
+                <div
+                  class="rating"
+                  v-if="book.rating">
+                  <span class="stars">★★★★★</span>
+                  <span class="review-count"
+                    >({{ book.reviewCount || 0 }})</span
+                  >
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div
-        v-if="recentBooks.length > 0"
-        class="view-all-container">
-        <RouterLink
-          to="/shop"
-          class="view-all-button">
-          Vedi Tutti i Libri
-        </RouterLink>
-      </div>
-    </section>
+          <div
+            v-if="recentBooks.length > 0"
+            class="view-all-container">
+            <RouterLink
+              to="/shop"
+              class="view-all-button">
+              Vedi Tutti i Libri
+            </RouterLink>
+          </div>
+        </section>
 
-    <!-- Book Categories Section -->
-    <section class="categories-section">
-      <div class="section-header">
-        <div class="category-indicator">
-          <span class="category-icon"></span>
-          <span>Categories</span>
-        </div>
-        <h2 class="section-title">Scegli per tipo di Libro</h2>
-        <div class="navigation-arrows">
-          <button class="arrow-left">
-            <i class="fas fa-arrow-left"></i>
-          </button>
-          <button class="arrow-right">
-            <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
+        <!-- Book Categories Section -->
+        <section class="categories-section">
+          <div class="section-header">
+            <div class="category-indicator">
+              <span class="category-icon"></span>
+              <span>Categories</span>
+            </div>
+            <h2 class="section-title">Scegli per tipo di Libro</h2>
+            <div class="navigation-arrows">
+              <button class="arrow-left">
+                <i class="fas fa-arrow-left"></i>
+              </button>
+              <button class="arrow-right">
+                <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
 
-      <div class="category-grid">
-        <div class="category-card">
-          <div class="category-icon">
-            <i class="fas fa-book"></i>
+          <div class="category-grid">
+            <div class="category-card">
+              <div class="category-icon">
+                <i class="fas fa-book"></i>
+              </div>
+              <span class="category-name">Fantasy</span>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">
+                <i class="fas fa-desktop"></i>
+              </div>
+              <span class="category-name">Saggi</span>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">
+                <i class="fas fa-clock"></i>
+              </div>
+              <span class="category-name">Biografie</span>
+            </div>
+            <div class="category-card active">
+              <div class="category-icon">
+                <i class="fas fa-camera"></i>
+              </div>
+              <span class="category-name">Gialli</span>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">
+                <i class="fas fa-headphones"></i>
+              </div>
+              <span class="category-name">Horror</span>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">
+                <i class="fas fa-gamepad"></i>
+              </div>
+              <span class="category-name">rosa</span>
+            </div>
           </div>
-          <span class="category-name">Fantasy</span>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">
-            <i class="fas fa-desktop"></i>
-          </div>
-          <span class="category-name">Saggi</span>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">
-            <i class="fas fa-clock"></i>
-          </div>
-          <span class="category-name">Biografie</span>
-        </div>
-        <div class="category-card active">
-          <div class="category-icon">
-            <i class="fas fa-camera"></i>
-          </div>
-          <span class="category-name">Gialli</span>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">
-            <i class="fas fa-headphones"></i>
-          </div>
-          <span class="category-name">Horror</span>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">
-            <i class="fas fa-gamepad"></i>
-          </div>
-          <span class="category-name">rosa</span>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <!-- Publishers Section -->
-    <section class="publishers-section">
-      <div class="section-header">
-        <div class="category-indicator">
-          <span class="category-icon"></span>
-          <span>Categories</span>
-        </div>
-        <h2 class="section-title">Per Casa Editrice</h2>
-        <div class="navigation-arrows">
-          <button class="arrow-left">
-            <i class="fas fa-arrow-left"></i>
-          </button>
-          <button class="arrow-right">
-            <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
+        <!-- Publishers Section -->
+        <section class="publishers-section">
+          <div class="section-header">
+            <div class="category-indicator">
+              <span class="category-icon"></span>
+              <span>Categories</span>
+            </div>
+            <h2 class="section-title">Per Casa Editrice</h2>
+            <div class="navigation-arrows">
+              <button class="arrow-left">
+                <i class="fas fa-arrow-left"></i>
+              </button>
+              <button class="arrow-right">
+                <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
 
-      <div class="publisher-grid">
-        <div class="publisher-card">
-          <div class="publisher-icon">
-            <i class="fas fa-book"></i>
+          <div class="publisher-grid">
+            <div class="publisher-card">
+              <div class="publisher-icon">
+                <i class="fas fa-book"></i>
+              </div>
+              <span class="publisher-name">Feltrinelli</span>
+            </div>
+            <div class="publisher-card">
+              <div class="publisher-icon">
+                <i class="fas fa-desktop"></i>
+              </div>
+              <span class="publisher-name">Ipperboria</span>
+            </div>
+            <div class="publisher-card">
+              <div class="publisher-icon">
+                <i class="fas fa-clock"></i>
+              </div>
+              <span class="publisher-name">Mondadori</span>
+            </div>
+            <div class="publisher-card active">
+              <div class="publisher-icon">
+                <i class="fas fa-camera"></i>
+              </div>
+              <span class="publisher-name">Giunti</span>
+            </div>
+            <div class="publisher-card">
+              <div class="publisher-icon">
+                <i class="fas fa-headphones"></i>
+              </div>
+              <span class="publisher-name">StarComics</span>
+            </div>
+            <div class="publisher-card">
+              <div class="publisher-icon">
+                <i class="fas fa-gamepad"></i>
+              </div>
+              <span class="publisher-name">Panini</span>
+            </div>
           </div>
-          <span class="publisher-name">Feltrinelli</span>
-        </div>
-        <div class="publisher-card">
-          <div class="publisher-icon">
-            <i class="fas fa-desktop"></i>
-          </div>
-          <span class="publisher-name">Ipperboria</span>
-        </div>
-        <div class="publisher-card">
-          <div class="publisher-icon">
-            <i class="fas fa-clock"></i>
-          </div>
-          <span class="publisher-name">Mondadori</span>
-        </div>
-        <div class="publisher-card active">
-          <div class="publisher-icon">
-            <i class="fas fa-camera"></i>
-          </div>
-          <span class="publisher-name">Giunti</span>
-        </div>
-        <div class="publisher-card">
-          <div class="publisher-icon">
-            <i class="fas fa-headphones"></i>
-          </div>
-          <span class="publisher-name">StarComics</span>
-        </div>
-        <div class="publisher-card">
-          <div class="publisher-icon">
-            <i class="fas fa-gamepad"></i>
-          </div>
-          <span class="publisher-name">Panini</span>
-        </div>
+        </section>
       </div>
-    </section>
+    </main>
 
     <!-- Adding footer component -->
     <Footer />
@@ -492,7 +500,19 @@ onMounted(() => {
   color: #333; /* Colore base per tutti i testi */
 }
 
-.app-container {
+.page-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  padding-top: 80px; /* Aggiunto padding per compensare la navbar fissa */
+  flex: 1;
+}
+
+.content-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;

@@ -1,6 +1,7 @@
 <template>
-  <div class="login-page">
+  <div>
     <Navbar />
+
     <main>
       <div class="container">
         <div class="image-section">
@@ -59,6 +60,7 @@
         </div>
       </div>
     </main>
+
     <Footer />
   </div>
 </template>
@@ -169,19 +171,14 @@ const signInWithGoogle = async () => {
   font-family: Arial, sans-serif;
 }
 
-body {
-  background-color: white; /* Sfondo bianco */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
 .container {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 50px;
-  width: 90%; /* Riduce la larghezza per centrare meglio il contenuto */
+  margin: 0 auto;
+  max-width: 1200px;
+  padding: 50px 20px;
+  width: 100%;
 }
 
 .image-section {
