@@ -29,6 +29,40 @@
       <div class="account-section">
         <h2>Informazioni Personali</h2>
         <form @submit.prevent="updateProfile">
+          <div class="profile-image-container">
+            <div class="profile-image">
+              <img
+                v-if="imagePreview"
+                :src="imagePreview"
+                alt="Immagine profilo" />
+              <div
+                v-else
+                class="no-image">
+                <span>Nessuna immagine</span>
+              </div>
+            </div>
+            <div class="image-upload">
+              <label for="profileImage">Carica immagine profilo</label>
+              <input
+                id="profileImage"
+                type="file"
+                accept="image/*"
+                @change="handleImageUpload" />
+              <button
+                v-if="profileData.profile_image"
+                type="button"
+                @click="removeProfileImage"
+                class="remove-image-btn">
+                Rimuovi immagine
+              </button>
+              <p
+                v-if="imageInfo"
+                class="image-info">
+                {{ imageInfo }}
+              </p>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="firstName">Nome</label>
             <input
@@ -344,6 +378,19 @@
           </div>
         </div>
       </div>
+
+      <!-- Storage settings debug (solo per sviluppo) -->
+      <div
+        class="debug-container"
+        v-if="isDevelopment">
+        <div class="storage-info">
+          <small><strong>Stato Storage:</strong> Base64</small>
+          <small
+            >Dimensione massima immagine:
+            {{ maxImageSize / 1024 / 1024 }}MB</small
+          >
+        </div>
+      </div>
     </div>
   </div>
   <div
@@ -369,11 +416,29 @@ const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpeWxmeXlmaXRxendzdGZ0enBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNjYyNDcsImV4cCI6MjA1Njc0MjI0N30.CvIx_vI-KGGcFlcZy66-DIC8Itk03Olw3lzEMhnJP_c";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Storage configuration
+const storageConfig = {
+  bucketName: "images",
+  maxRetries: 2,
+  storagePath: "profiles",
+};
+
+// Environment check
+const isDevelopment = process.env.NODE_ENV === "development";
+
 const router = useRouter();
 const user = ref(null);
 const loading = ref(true);
 const errorMessage = ref("");
 const successMessage = ref("");
+const imageInfo = ref("");
+const imagePreview = ref(""); // Per mostrare l'anteprima
+const useStorageBucket = ref(true); // Flag per indicare se usare il bucket o base64
+
+// Configurazione per la gestione delle immagini
+const maxImageSize = 1024 * 1024; // 1MB di default
+const maxImageDimension = 1200; // Dimensione max per larghezza/altezza
+const imageQuality = 0.7; // Qualità compressione JPEG
 
 // Profile data
 const profileData = ref({
@@ -381,6 +446,7 @@ const profileData = ref({
   last_name: "",
   phone: "",
   description: "",
+  profile_image: "",
 });
 
 // Addresses
@@ -418,6 +484,10 @@ onMounted(async () => {
   }
 
   user.value = session.user;
+
+  // Verifica disponibilità storage
+  await checkBucketExists();
+
   await fetchUserData();
 });
 
@@ -443,12 +513,251 @@ const fetchUserData = async () => {
   }
 };
 
-// Fetch user profile
+// Verifica se il bucket esiste
+const checkBucketExists = async () => {
+  try {
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+
+    if (error) {
+      console.error("Errore nel verificare i bucket:", error);
+      useStorageBucket.value = false;
+      return false;
+    }
+
+    const bucketExists = buckets.some(
+      (b) => b.name === storageConfig.bucketName
+    );
+    useStorageBucket.value = bucketExists;
+
+    if (!bucketExists) {
+      console.warn(
+        `Il bucket ${storageConfig.bucketName} non esiste, si userà base64`
+      );
+    }
+
+    return bucketExists;
+  } catch (err) {
+    console.error("Errore imprevisto:", err);
+    useStorageBucket.value = false;
+    return false;
+  }
+};
+
+// Upload image to Supabase Storage
+const uploadImageToStorage = async (file) => {
+  if (!user.value?.id) {
+    throw new Error("Utente non autenticato");
+  }
+
+  // Generate a unique file name
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 10)}.${fileExt}`;
+  const filePath = `${storageConfig.storagePath}/${user.value.id}/${fileName}`;
+
+  console.log(
+    `Caricamento immagine su ${storageConfig.bucketName}/${filePath}`
+  );
+
+  let retryCount = 0;
+
+  while (retryCount <= storageConfig.maxRetries) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(storageConfig.bucketName)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      // Get public URL for the uploaded image
+      const { data: urlData } = supabase.storage
+        .from(storageConfig.bucketName)
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error("URL pubblico non disponibile");
+      }
+
+      console.log("Immagine caricata con successo:", urlData.publicUrl);
+      return urlData.publicUrl;
+    } catch (err) {
+      retryCount++;
+      console.error(
+        `Tentativo ${retryCount}/${storageConfig.maxRetries + 1} fallito:`,
+        err
+      );
+
+      if (retryCount > storageConfig.maxRetries) {
+        throw err;
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+};
+
+// Handle image upload with storage support
+const handleImageUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  imageInfo.value = "";
+  errorMessage.value = "";
+
+  // Validation
+  if (!file.type.match("image.*")) {
+    errorMessage.value = "Puoi caricare solo file immagine";
+    return;
+  }
+
+  // Check file size
+  if (file.size > maxImageSize) {
+    errorMessage.value = `L'immagine è troppo grande. Dimensione massima: ${
+      maxImageSize / 1024 / 1024
+    }MB`;
+    return;
+  }
+
+  try {
+    loading.value = true;
+
+    // Process image for preview
+    const optimizedBase64 = await processAndOptimizeImage(file);
+    imagePreview.value = optimizedBase64;
+
+    // Check if we can use storage bucket
+    await checkBucketExists();
+
+    if (useStorageBucket.value) {
+      // Use Storage - store URL reference
+      try {
+        const imageUrl = await uploadImageToStorage(file);
+        profileData.value.profile_image = imageUrl;
+
+        // Show URL info instead of size
+        imageInfo.value = `Immagine caricata su: ${storageConfig.bucketName}`;
+      } catch (storageError) {
+        console.error("Errore nel caricamento su storage:", storageError);
+        errorMessage.value = `Errore nel caricamento dell'immagine: ${storageError.message}`;
+        profileData.value.profile_image = "";
+      }
+    } else {
+      // Fallback to Base64
+      profileData.value.profile_image = optimizedBase64;
+
+      // Show size info
+      const sizeKB = Math.round((optimizedBase64.length * 0.75) / 1024);
+      imageInfo.value = `Immagine caricata (${sizeKB}KB - Base64)`;
+    }
+  } catch (error) {
+    console.error("Errore nel caricamento dell'immagine:", error);
+    errorMessage.value =
+      "Errore nel caricamento dell'immagine: " + error.message;
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Process and optimize image
+const processAndOptimizeImage = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          // Resize if needed
+          let { width, height } = img;
+          let needsResize = false;
+
+          if (width > maxImageDimension || height > maxImageDimension) {
+            needsResize = true;
+            if (width > height) {
+              height = height * (maxImageDimension / width);
+              width = maxImageDimension;
+            } else {
+              width = width * (maxImageDimension / height);
+              height = maxImageDimension;
+            }
+          }
+
+          // Create canvas for resizing/optimizing
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+
+          // Draw and compress
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to base64 with quality setting
+          const optimizedBase64 = canvas.toDataURL("image/jpeg", imageQuality);
+          resolve(optimizedBase64);
+        } catch (err) {
+          reject(new Error("Errore durante l'ottimizzazione dell'immagine"));
+        }
+      };
+
+      img.onerror = () => {
+        reject(new Error("Impossibile caricare l'immagine"));
+      };
+
+      img.src = e.target.result;
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Errore nella lettura del file"));
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+
+// Remove profile image
+const removeProfileImage = async () => {
+  // Se c'è un'immagine su storage, tenta di eliminarla
+  if (
+    profileData.value.profile_image &&
+    useStorageBucket.value &&
+    profileData.value.profile_image.includes("storage")
+  ) {
+    try {
+      // Estrai il path dal URL
+      const urlParts = profileData.value.profile_image.split("/");
+      const fileName = urlParts[urlParts.length - 1];
+      const userId = user.value.id;
+      const filePath = `${storageConfig.storagePath}/${userId}/${fileName}`;
+
+      const { error } = await supabase.storage
+        .from(storageConfig.bucketName)
+        .remove([filePath]);
+
+      if (error) {
+        console.error("Errore nell'eliminazione dell'immagine:", error);
+      }
+    } catch (err) {
+      console.error("Errore nella rimozione dell'immagine da storage:", err);
+    }
+  }
+
+  profileData.value.profile_image = "";
+  imagePreview.value = "";
+  imageInfo.value = "";
+};
+
+// Fetch user profile - Check if profile image is URL or Base64
 const fetchProfile = async () => {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("user_id", user.value.id)
+    .eq("id", user.value.id)
     .single();
 
   if (error) {
@@ -461,29 +770,77 @@ const fetchProfile = async () => {
 
   if (data) {
     profileData.value = data;
+
+    // Set preview image to same as profile image
+    if (data.profile_image) {
+      imagePreview.value = data.profile_image;
+
+      // Determine if we're using Storage or Base64
+      if (
+        data.profile_image.includes("storage") ||
+        data.profile_image.startsWith("http")
+      ) {
+        useStorageBucket.value = true;
+      } else if (data.profile_image.startsWith("data:image")) {
+        useStorageBucket.value = false;
+      }
+    }
   }
 };
 
-// Update user profile
+// Update user profile - Modified to handle URL vs Base64
 const updateProfile = async () => {
   try {
-    // Assicurati che user_id corrisponda alla chiave primaria usata nella tabella profiles
-    const { data, error } = await supabase
-      .from("profiles")
-      .upsert({
-        id: user.value.id, // Assicurati che questo campo corrisponda alla chiave primaria
-        user_id: user.value.id,
-        first_name: profileData.value.first_name,
-        last_name: profileData.value.last_name,
-        phone: profileData.value.phone,
-        description: profileData.value.description,
-        updated_at: new Date().toISOString(),
-      })
-      .select();
+    loading.value = true;
+    errorMessage.value = "";
 
-    if (error) throw error;
+    // Preparazione dei dati di base del profilo (sempre presenti)
+    const profileDataToUpdate = {
+      id: user.value.id,
+      user_id: user.value.id,
+      first_name: profileData.value.first_name,
+      last_name: profileData.value.last_name,
+      phone: profileData.value.phone,
+      description: profileData.value.description,
+      updated_at: new Date().toISOString(),
+      profile_image: profileData.value.profile_image,
+    };
 
-    successMessage.value = "Profilo aggiornato con successo!";
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(profileDataToUpdate)
+        .select();
+
+      if (error) {
+        // Se c'è un errore specifico sulla colonna profile_image
+        if (error.message.includes("profile_image")) {
+          console.warn(
+            "La colonna profile_image causa problemi. Ritento senza immagine."
+          );
+          delete profileDataToUpdate.profile_image;
+
+          const { data: retryData, error: retryError } = await supabase
+            .from("profiles")
+            .upsert(profileDataToUpdate)
+            .select();
+
+          if (retryError) throw retryError;
+
+          successMessage.value =
+            "Profilo aggiornato con successo! (Immagine non supportata)";
+          errorMessage.value =
+            "Il database non supporta il caricamento delle immagini. Contatta l'amministratore.";
+        } else {
+          throw error;
+        }
+      } else {
+        successMessage.value = "Profilo aggiornato con successo!";
+      }
+    } catch (error) {
+      throw error;
+    }
+
     setTimeout(() => {
       successMessage.value = "";
     }, 3000);
@@ -492,6 +849,8 @@ const updateProfile = async () => {
     errorMessage.value =
       "Errore durante l'aggiornamento del profilo: " +
       (error.message || JSON.stringify(error));
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -673,22 +1032,48 @@ const addToCart = (productId) => {
   }, 3000);
 };
 
-// Fetch reviews
+// Fetch reviews - Fix the relationship issue
 const fetchReviews = async () => {
-  const { data, error } = await supabase
-    .from("reviews")
-    .select(
-      `
-      *,
-      product:products(*)
-    `
-    )
-    .eq("user_id", user.value.id)
-    .order("created_at", { ascending: false });
+  try {
+    // Prima otteniamo le recensioni dell'utente
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from("reviews")
+      .select("*")
+      .eq("user_id", user.value.id)
+      .order("created_at", { ascending: false });
 
-  if (error) throw error;
+    if (reviewsError) throw reviewsError;
 
-  reviews.value = data || [];
+    if (reviewsData && reviewsData.length > 0) {
+      // Per ogni recensione, otteniamo il prodotto relativo
+      const reviewsWithProducts = await Promise.all(
+        reviewsData.map(async (review) => {
+          const { data: productData, error: productError } = await supabase
+            .from("products")
+            .select("*")
+            .eq("id", review.product_id)
+            .single();
+
+          if (productError && productError.code !== "PGRST116") {
+            console.error("Error fetching product:", productError);
+          }
+
+          return {
+            ...review,
+            product: productData || { name: "Prodotto non disponibile" },
+          };
+        })
+      );
+
+      reviews.value = reviewsWithProducts;
+    } else {
+      reviews.value = [];
+    }
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    errorMessage.value =
+      "Errore nel caricamento delle recensioni: " + error.message;
+  }
 };
 
 // Edit review
@@ -1040,6 +1425,80 @@ textarea {
   display: flex;
   gap: 0.5rem;
   padding: 0 1rem 1rem 1rem;
+}
+
+.profile-image-container {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-image {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+}
+
+.profile-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.no-image {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+}
+
+.image-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.remove-image-btn {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 0.875rem;
+}
+
+.remove-image-btn:hover {
+  background-color: #ffcdd2;
+}
+
+.image-info {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.debug-container {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.storage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 @media (min-width: 768px) {

@@ -1,15 +1,82 @@
 -- Attiva l'estensione uuid-ossp
 create extension if not exists "uuid-ossp";
 
+-- Assicurati che il ruolo anon abbia accesso al bucket storage
+grant usage on schema storage to anon, authenticated;
+grant select on storage.buckets to anon, authenticated;
+grant select on storage.objects to anon, authenticated;
+grant insert, update, delete on storage.objects to authenticated;
+
+-- Crea un bucket di storage per le immagini se non esiste
+-- Questo permette di salvare le immagini nel bucket invece che in base64 nel database
+insert into storage.buckets (id, name, public)
+values ('images', 'images', true)
+on conflict (id) do nothing;
+
+-- Verifica che il bucket sia stato creato e sia pubblico
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'images' AND public = true) THEN
+    UPDATE storage.buckets SET public = true WHERE id = 'images';
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Il bucket "images" non è stato creato correttamente';
+    END IF;
+  END IF;
+END $$;
+
+-- Crea policy di accesso al bucket images
+-- Chiunque può visualizzare le immagini
+drop policy if exists "Anyone can view images" on storage.objects;
+create policy "Anyone can view images"
+on storage.objects for select
+using (bucket_id = 'images');
+
+-- Gli utenti autenticati possono caricare immagini
+drop policy if exists "Authenticated users can upload images" on storage.objects;
+create policy "Authenticated users can upload images"
+on storage.objects for insert
+with check (bucket_id = 'images' and auth.role() = 'authenticated');
+
+-- Gli utenti possono aggiornare o eliminare solo le loro immagini
+drop policy if exists "Users can update own images" on storage.objects;
+create policy "Users can update own images"
+on storage.objects for update
+using (bucket_id = 'images' and auth.uid() = owner);
+
+drop policy if exists "Users can delete own images" on storage.objects;
+create policy "Users can delete own images"
+on storage.objects for delete
+using (bucket_id = 'images' and auth.uid() = owner);
+
+-- Funzione per validare che un campo sia un URL del bucket images
+CREATE OR REPLACE FUNCTION validate_storage_url(url TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- Permetti NULL e verifica che sia un URL che contiene '/storage/' e '/images/'
+  RETURN url IS NULL OR url ~ '/storage/.*images/';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Modifica tabella profiles per garantire che profile_image sia un URL
 create table IF NOT EXISTS profiles (
   id uuid references auth.users on delete cascade primary key,
   first_name text,
   last_name text,
   phone text,
   description text,
+  profile_image text CHECK (validate_storage_url(profile_image)), 
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone
 );
+
+-- Invece di indicizzare direttamente la colonna, crea un indice sul suo hash MD5
+-- questo risolve il problema della dimensione eccessiva dell'indice
+DROP INDEX IF EXISTS idx_profiles_profile_image;
+CREATE INDEX idx_profiles_profile_image_md5 ON profiles(md5(profile_image)) 
+  WHERE profile_image IS NOT NULL;
+
+-- Aggiungi un commento sulla colonna profile_image
+COMMENT ON COLUMN profiles.profile_image IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://xxx.supabase.co/storage/v1/object/public/images/users/{user_id}/{filename})';
 
 -- Elimina le policy esistenti per poterle ricreare
 DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
@@ -29,20 +96,43 @@ create policy "Users can insert their own profile"
   on profiles for insert 
   with check (auth.uid() = id);
 
-DROP TABLE IF EXISTS products CASCADE;  -- Solo se necessario ricrearlo completamente
-create table IF NOT EXISTS products (
+-- Modifica tabella products per garantire che image_url sia un URL
+DROP TABLE IF EXISTS products CASCADE;  
+create table products (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
   description text,
   price decimal not null,
-  image_url text,
-  user_id uuid references auth.users, -- Aggiunta colonna user_id
-  metadata jsonb,                     -- Aggiunta colonna metadata per dettagli aggiuntivi
-  status text default 'active',       -- Aggiunta colonna status
+  image_url text CHECK (validate_storage_url(image_url)),
+  user_id uuid references auth.users not null,
+  metadata jsonb,
+  status text default 'active',
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
 
+-- Usa un indice MD5 anche qui per la performance ed evitare errori di dimensione
+CREATE INDEX idx_products_image_url_md5 ON products(md5(image_url))
+  WHERE image_url IS NOT NULL;
+
+-- Aggiungi un commento sulla colonna image_url
+COMMENT ON COLUMN products.image_url IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://xxx.supabase.co/storage/v1/object/public/images/products/{product_id}/{filename})';
+
+-- Trigger per aggiornare timestamp updated_at quando si modifica un prodotto
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_products_modtime
+BEFORE UPDATE ON products
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Policies per products
 DROP POLICY IF EXISTS "Anyone can view products" ON products;
 create policy "Anyone can view products" on products for select using (true);
 
