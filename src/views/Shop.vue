@@ -4,6 +4,70 @@ import { RouterLink, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "../components/Navbar.vue";
 import Footer from "../components/footer.vue";
+import { onUnmounted } from "vue";
+
+// Slider data
+const slides = ref([
+  {
+    image: "https://placehold.co/1200x400?text=Slide+1",
+    title: "Scopri il Meglio della Lettura",
+    description:
+      "Esplora una vasta selezione di libri per ogni passione e interesse.",
+    link: "https://www.example.com/slide1", // URL di destinazione
+  },
+  {
+    image: "https://placehold.co/1200x400?text=Slide+2",
+    title: "Offerte Esclusive per Te",
+    description: "Approfitta di sconti imperdibili sui tuoi libri preferiti.",
+    link: "https://www.example.com/slide2", // URL di destinazione
+  },
+  {
+    image: "https://placehold.co/1200x400?text=Slide+3",
+    title: "Nuovi Arrivi Ogni Settimana",
+    description: "Rimani aggiornato con le ultime novità editoriali.",
+    link: "https://www.example.com/slide3", // URL di destinazione
+  },
+]);
+
+const currentSlide = ref(0);
+let autoplayInterval: number | undefined;
+
+// Funzione per avviare l'autoplay
+const startAutoplay = () => {
+  stopAutoplay(); // Ferma eventuali intervalli attivi
+  autoplayInterval = setInterval(nextSlide, 3000); // Cambia slide ogni 3 secondi
+};
+
+// Funzione per fermare l'autoplay
+const stopAutoplay = () => {
+  if (autoplayInterval) {
+    clearInterval(autoplayInterval);
+    autoplayInterval = undefined;
+  }
+};
+
+// Funzione per passare alla slide successiva
+const nextSlide = () => {
+  currentSlide.value = (currentSlide.value + 1) % slides.value.length;
+  startAutoplay(); // Resetta il timer
+};
+
+// Funzione per passare alla slide precedente
+const prevSlide = () => {
+  currentSlide.value =
+    (currentSlide.value - 1 + slides.value.length) % slides.value.length;
+  startAutoplay(); // Resetta il timer
+};
+
+// Avvia l'autoplay quando il componente è montato
+onMounted(() => {
+  startAutoplay();
+});
+
+// Ferma l'autoplay quando il componente viene distrutto
+onUnmounted(() => {
+  stopAutoplay();
+});
 
 // Type definitions for better type safety
 interface Book {
@@ -211,13 +275,47 @@ onMounted(() => {
     <main>
       <div class="content-container">
         <!-- Hero Banner / Slider -->
-        <div class="hero-banner">
-          <div class="slider-content">
-            <h2 class="slider-title">Sara uno slider</h2>
-            <p class="slider-description">Inserire immagine trend del sito</p>
-          </div>
-        </div>
 
+        <div class="hero-banner">
+          <div
+            class="slider"
+            :style="{ '--current-slide': currentSlide }">
+            <div
+              v-for="(slide, index) in slides"
+              :key="index"
+              class="slide">
+              <!-- Aggiunto il link cliccabile -->
+              <a
+                :href="slide.link"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="slide-link">
+                <img
+                  :src="slide.image"
+                  :alt="`Immagine dello slider: ${slide.title}`"
+                  class="slide-image"
+                  loading="lazy" />
+              </a>
+            </div>
+          </div>
+          <!-- Contenuto testuale dello slider -->
+          <div class="slider-text">
+            <h2 class="slider-title">{{ slides[currentSlide].title }}</h2>
+            <p class="slider-description">
+              {{ slides[currentSlide].description }}
+            </p>
+          </div>
+          <button
+            class="prev-button"
+            @click="prevSlide">
+            ❮
+          </button>
+          <button
+            class="next-button"
+            @click="nextSlide">
+            ❯
+          </button>
+        </div>
         <!-- Search Section -->
         <div class="search-section">
           <div class="search-container">
@@ -905,6 +1003,112 @@ nav.nav-buttons {
 .publisher-name {
   font-size: 14px;
   font-weight: 500; /* Aggiunto peso del font per migliorare leggibilità */
+}
+
+/*Style slider*/
+
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  height: 330px; /* Altezza dello slider */
+  margin-top: -45px; /* Ridotto il margine superiore */
+}
+
+.slider-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none; /* Rimuove la sottolineatura */
+}
+.slider-link:hover {
+  text-decoration: none; /* Rimuove la sottolineatura al passaggio del mouse */
+}
+
+.slider {
+  display: flex;
+  transition: transform 0.5s ease-in-out;
+  transform: translateX(calc(-100% * var(--current-slide, 0)));
+}
+
+.slide {
+  min-width: 100%;
+  flex-shrink: 0;
+}
+
+.slide-image {
+  width: 100%;
+  height: 100%; /* L'immagine occupa tutta l'altezza dello slider */
+  object-fit: cover; /* Assicura che l'immagine si adatti senza deformarsi */
+  border-radius: 10px;
+}
+.slider-text {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 10; /* Assicura che le scritte siano sopra gli altri elementi */
+  color: white;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.5
+  ); /* Sfondo semi-trasparente per migliorare la leggibilità */
+  padding: 10px 15px; /* Aggiunge spazio interno */
+  border-radius: 8px; /* Arrotonda gli angoli */
+}
+.slider-content {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  color: white;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.slider-title {
+  font-size: 32px; /* Aumentata la dimensione del titolo */
+  font-weight: 700; /* Reso più audace */
+  margin-bottom: 15px;
+  color: #ffffff; /* Colore bianco per contrasto */
+  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
+}
+
+.slider-description {
+  font-size: 18px; /* Aumentata la dimensione del testo */
+  font-weight: 400; /* Reso più leggibile */
+  color: #f0f0f0; /* Colore leggermente più chiaro */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
+  line-height: 1.5; /* Migliorata la leggibilità */
+}
+
+.prev-button,
+.next-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%); /* Centra verticalmente */
+  background-color: rgba(0, 0, 0, 0.8); /* Colore nero più scuro */
+  color: white;
+  border: none;
+  padding: 0; /* Rimuove padding extra */
+  cursor: pointer;
+  border-radius: 50%;
+  z-index: 10;
+  font-size: 24px; /* Aumenta la dimensione della freccia */
+  width: 47px; /* Dimensione del pulsante */
+  height: 47px; /* Dimensione del pulsante */
+  display: flex;
+  align-items: center; /* Centra verticalmente il contenuto */
+  justify-content: center; /* Centra orizzontalmente il contenuto */
+  line-height: 0; /* Rimuove eventuali spazi extra */
+}
+
+.prev-button {
+  left: 15px; /* Posiziona la freccia a sinistra */
+}
+
+.next-button {
+  right: 15px; /* Posiziona la freccia a destra */
 }
 
 /* Responsive Styles */

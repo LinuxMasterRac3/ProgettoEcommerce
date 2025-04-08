@@ -38,6 +38,31 @@ interface User {
   memberSince?: string;
 }
 
+// Funzione per aggiungere il libro al carrello
+const addToCart = async () => {
+  if (!product.value) return;
+
+  try {
+    // Recupera il carrello dal localStorage
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+    // Controlla se il libro è già nel carrello
+    if (cart.includes(product.value.id)) {
+      alert("Questo libro è già nel carrello.");
+      return;
+    }
+
+    // Aggiungi l'ID del libro al carrello
+    cart.push(product.value.id);
+    localStorage.setItem("cart", JSON.stringify(cart));
+
+    alert("Libro aggiunto al carrello!");
+  } catch (error) {
+    console.error("Errore durante l'aggiunta al carrello:", error);
+    alert("Si è verificato un errore. Riprova più tardi.");
+  }
+};
+
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
 const supabaseKey =
@@ -184,6 +209,11 @@ onMounted(() => {
             <div class="product-buttons">
               <button class="contact-button">Contatta il venditore</button>
               <button class="buy-button">Acquista ora</button>
+              <button
+                class="add-to-cart-button"
+                @click="addToCart">
+                Aggiungi al carrello
+              </button>
             </div>
             <div class="shipping-info">
               <i class="shipping-icon">🚚</i>
@@ -444,5 +474,19 @@ onMounted(() => {
 .related-product-price {
   font-size: 14px;
   color: #666;
+}
+.add-to-cart-button {
+  padding: 12px 24px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.add-to-cart-button:hover {
+  background-color: #218838;
 }
 </style>

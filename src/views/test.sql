@@ -57,33 +57,87 @@ create policy "Anyone can view images"
 on storage.objects for select
 using (bucket_id = 'images');
 
--- Gli utenti autenticati possono caricare immagini
-drop policy if exists "Authenticated users can upload images" on storage.objects;
-create policy "Authenticated users can upload images"
-on storage.objects for insert
-with check (
-  bucket_id = 'images' 
-  AND auth.role() = 'authenticated'
-);
+-- Gli utenti autentFeedback
 
--- Gli utenti possono aggiornare o eliminare solo le loro immagini
-drop policy if exists "Users can update own images" on storage.objects;
-create policy "Users can update own images"
-on storage.objects for update
-using (bucket_id = 'images' and auth.uid() = owner);
+Project overview
+Table Editor
+SQL Editor
+Database
+Authentication
+Storage
+Edge Functions
+Realtime
+Advisors
+Reports
+Logs
+API Docs
+Integrations
+
+    Project Settings
+
+Table Editor
+Search tables
+4
+Auth policies
+id
+name
+description
+price
+image_url
+user_id
+
+Page
+
+of 1
+
+4 records
+definitiondata
+
+Supabase
 
 drop policy if exists "Users can delete own images" on storage.objects;
 create policy "Users can delete own images"
 on storage.objects for delete
 using (bucket_id = 'images' and auth.uid() = owner);
 
--- Funzione per validare che un campo sia un URL del bucket images
-CREATE OR REPLACE FUNCTION validate_storage_url(url TEXT)
-RETURNS BOOLEAN AS $$
-BEGIN
-  -- Permetti solo URL del bucket images
-  RETURN url IS NULL OR 
-         url ~ '^https://tiylfyyfitqzwstftzpg\.supabase\.co/storage/v1/.*images/' OR
+-- Funzione per validare che un campo sia un URL del bucket imageFeedback
+
+Project overview
+Table Editor
+SQL Editor
+Database
+Authentication
+Storage
+Edge Functions
+Realtime
+Advisors
+Reports
+Logs
+API Docs
+Integrations
+
+    Project Settings
+
+Table Editor
+Search tables
+4
+Auth policies
+id
+name
+description
+price
+image_url
+user_id
+
+Page
+
+of 1
+
+4 records
+definitiondata
+
+Supabase
+ge/v1/.*images/' OR
          url ~ '^/storage/v1/.*images/';
 END;
 $$ LANGUAGE plpgsql;
