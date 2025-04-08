@@ -24,6 +24,16 @@ interface Book {
   isbn?: string;
   category?: string;
   user_id?: string;
+  metadata?: {
+    notes?: string;
+    author?: string;
+    category?: string;
+    location?: string;
+    condition?: string;
+    publisher?: string;
+    additional_images?: string[];
+    shipping_available?: boolean;
+  };
 }
 
 interface User {
@@ -110,6 +120,7 @@ const fetchProductDetails = async () => {
         isbn: productData.isbn,
         category: productData.category,
         user_id: productData.user_id,
+        metadata: productData.metadata || {},
       };
 
       if (productData.user_id) {
@@ -236,6 +247,40 @@ onMounted(() => {
           <p>{{ product.description || "Descrizione non disponibile" }}</p>
         </div>
 
+        <!-- Metadata section -->
+        <div
+          class="product-metadata"
+          v-if="product.metadata">
+          <h2>Informazioni aggiuntive</h2>
+          <ul>
+            <li><strong>Note:</strong> {{ product.metadata.notes }}</li>
+            <li><strong>Categoria:</strong> {{ product.metadata.category }}</li>
+            <li>
+              <strong>Condizione:</strong> {{ product.metadata.condition }}
+            </li>
+            <li>
+              <strong>Casa Editrice:</strong> {{ product.metadata.publisher }}
+            </li>
+            <li><strong>Posizione:</strong> {{ product.metadata.location }}</li>
+            <li>
+              <strong>Spedizione Disponibile:</strong>
+              {{ product.metadata.shipping_available }}
+            </li>
+          </ul>
+          <div
+            class="additional-images"
+            v-if="product.metadata.additional_images?.length">
+            <h3>Immagini aggiuntive</h3>
+            <div
+              v-for="(url, index) in product.metadata.additional_images"
+              :key="index">
+              <img
+                :src="url"
+                alt="Immagine aggiuntiva" />
+            </div>
+          </div>
+        </div>
+
         <!-- Related products -->
         <div class="related-products">
           <h2>Prodotti correlati</h2>
@@ -277,6 +322,15 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
+Nome prodotto
+
+€20.00
+Prodotto correlato
+
+Nome prodotto
+
+€20.00
+
 
 /* Product details */
 .product-detail-container {
