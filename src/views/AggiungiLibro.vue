@@ -51,19 +51,6 @@
         v-if="errorMessage"
         class="error-message">
         <div v-html="errorMessage"></div>
-        <div
-          v-if="useBase64Storage"
-          class="storage-info">
-          <p>
-            Consulta la
-            <a
-              href="https://supabase.com/docs/guides/storage"
-              target="_blank"
-              >documentazione di Supabase Storage</a
-            >
-            per configurare il bucket.
-          </p>
-        </div>
       </div>
 
       <div class="form-container">
@@ -340,25 +327,19 @@
         </form>
       </div>
 
-      <!-- Aggiungi un pulsante per il debug dei bucket -->
+      <!-- Simplified storage status indicator -->
       <div
         class="debug-container"
         v-if="isAuthenticated">
         <div class="endpoint-info">
-          <small
-            ><strong>Stato Storage:</strong>
-            {{ useBase64Storage ? "Base64" : "Supabase Storage" }}</small
-          >
-          <small v-if="selectedBucketName"
-            >Bucket attualmente usato: {{ selectedBucketName }}</small
-          >
+          <small><strong>Bucket di storage:</strong> images</small>
         </div>
         <button
           type="button"
           class="debug-button"
-          @click="checkBucketManually"
+          @click="verifyStorageAccess"
           title="Verifica la connessione ai bucket di storage">
-          <i class="fas fa-database"></i> Verifica bucket
+          <i class="fas fa-database"></i> Verifica connessione
         </button>
       </div>
     </div>
@@ -380,12 +361,8 @@ const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpeWxmeXlmaXRxendzdGZ0enBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNjYyNDcsImV4cCI6MjA1Njc0MjI0N30.CvIx_vI-KGGcFlcZy66-DIC8Itk03Olw3lzEMhnJP_c";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Storage configuration
-const storageConfig = {
-  bucketName: "images",
-  fallbackToBuckets: true,
-  maxRetries: 3,
-};
+// Storage configuration semplificata
+const storageBucket = "images";
 
 const router = useRouter();
 
@@ -421,271 +398,180 @@ const errors = reactive({
 const isSubmitting = ref(false);
 const successMessage = ref("");
 const errorMessage = ref("");
-const bucketExists = ref(false);
-const selectedBucketName = ref("");
-const useBase64Storage = ref(false);
 
-// Funzione corretta per verificare l'accesso al bucket
-const checkAndSetBucket = async () => {
-  try {
-    console.log("🔍 Verificando accesso al bucket:", storageConfig.bucketName);
-
-    const { data: buckets, error: listError } =
-      await supabase.storage.listBuckets();
-
-    if (listError) {
-      console.error("❌ Errore nell'elencare i bucket:", listError);
-      useBase64Storage.value = true;
-      errorMessage.value =
-        "Impossibile accedere allo storage: " + listError.message;
-      return;
-    }
-
-    if (!buckets || buckets.length === 0) {
-      console.log("⚠️ Nessun bucket trovato, tentativo di creazione...");
-      try {
-        const { data: newBucket, error: createError } =
-          await supabase.storage.createBucket(storageConfig.bucketName, {
-            public: true,
-          });
-
-        if (createError) {
-          console.error("❌ Errore nella creazione del bucket:", createError);
-          useBase64Storage.value = true;
-          return;
-        }
-
-        console.log("✅ Bucket creato con successo:", newBucket);
-        selectedBucketName.value = storageConfig.bucketName;
-        bucketExists.value = true;
-        useBase64Storage.value = false;
-        return;
-      } catch (createErr) {
-        console.error("❌ Errore nella creazione del bucket:", createErr);
-        useBase64Storage.value = true;
-        return;
-      }
-    }
-
-    const foundBucket = buckets.find(
-      (b) => b.name === storageConfig.bucketName
-    );
-    if (foundBucket) {
-      console.log(`✅ Bucket "${storageConfig.bucketName}" trovato!`);
-      selectedBucketName.value = storageConfig.bucketName;
-      bucketExists.value = true;
-      useBase64Storage.value = false;
-
-      if (!foundBucket.public) {
-        console.warn(
-          "⚠️ Il bucket non è pubblico. Le immagini potrebbero non essere accessibili."
-        );
-      }
-      return;
-    }
-
-    if (storageConfig.fallbackToBuckets && buckets.length > 0) {
-      console.log(
-        `⚠️ Bucket "${storageConfig.bucketName}" non trovato. Uso alternativa:`,
-        buckets[0].name
-      );
-      selectedBucketName.value = buckets[0].name;
-      bucketExists.value = true;
-      useBase64Storage.value = false;
-      return;
-    }
-
-    console.error("❌ Nessun bucket utilizzabile trovato");
-    useBase64Storage.value = true;
-    errorMessage.value =
-      "Nessun bucket storage disponibile. Verranno utilizzate immagini in Base64.";
-  } catch (err) {
-    console.error("❌ Errore imprevisto:", err);
-    useBase64Storage.value = true;
-    errorMessage.value = "Errore accesso storage: " + err.message;
-  }
-};
-
-// Funzione migliorata per il debug dello storage
-const debugStorageConfig = async () => {
-  try {
-    console.group("🛠️ Debug Supabase Storage");
-    console.log("📊 URL Supabase:", supabaseUrl);
-
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-    if (authError) {
-      console.error("❌ Errore autenticazione:", authError);
-      return { error: authError };
-    }
-
-    console.log(
-      "👤 Stato autenticazione:",
-      session ? `Autenticato come ${session.user.email}` : "Non autenticato"
-    );
-
-    if (!session) {
-      console.warn(
-        "⚠️ L'utente non è autenticato. Le operazioni di storage potrebbero fallire."
-      );
-      return { error: "Utente non autenticato" };
-    }
-
-    try {
-      const { data: buckets, error: listError } =
-        await supabase.storage.listBuckets();
-
-      if (listError) {
-        console.error("❌ Errore nell'elencare i bucket:", listError);
-        return { error: listError };
-      }
-
-      console.log("📁 Bucket disponibili:", buckets?.length || 0);
-      if (buckets && buckets.length > 0) {
-        buckets.forEach((bucket) => {
-          console.log(
-            `📦 ${bucket.name} (${bucket.id}) - Pubblico: ${
-              bucket.public ? "Sì" : "No"
-            }`
-          );
-        });
-        return { buckets, success: true };
-      } else {
-        console.warn("⚠️ Nessun bucket presente nel progetto");
-        return { buckets: [], success: true };
-      }
-    } catch (err) {
-      console.error("❌ Errore imprevisto:", err);
-      return { error: err };
-    } finally {
-      console.groupEnd();
-    }
-  } catch (err) {
-    console.error("❌ Errore debug:", err);
-    return { error: err };
-  }
-};
-
-// Versione ottimizzata della funzione uploadImages
+// Funzione semplificata per caricare le immagini direttamente
 const uploadImages = async (files) => {
-  if (
-    useBase64Storage.value ||
-    !bucketExists.value ||
-    !selectedBucketName.value
-  ) {
-    console.log("📝 Utilizzo formato Base64 per le immagini");
-    return photoPreview.value;
+  if (!user.value?.id) {
+    throw new Error("Utente non autenticato");
   }
 
-  console.log(`📤 Caricamento su bucket "${selectedBucketName.value}"`);
+  console.log(`📤 Caricamento diretto nel bucket "${storageBucket}"`);
   const imageUrls = [];
-  let retryCount = 0;
-  const maxRetries = storageConfig.maxRetries;
 
   for (const file of files) {
-    let success = false;
-    retryCount = 0;
+    try {
+      const fileExt = file.name.split(".").pop().toLowerCase();
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(2, 10);
+      const fileName = `${timestamp}_${randomId}.${fileExt}`;
+      const userId = user.value.id;
+      const filePath = `users/${userId}/${fileName}`;
 
-    while (!success && retryCount < maxRetries) {
-      try {
-        const fileName = `${Date.now()}_${Math.random()
-          .toString(36)
-          .substring(2, 10)}.${file.name.split(".").pop()}`;
-        const userId = user.value?.id || "anonymous";
-        const filePath = `users/${userId}/${fileName}`;
+      console.log(`🔄 Caricamento file: ${filePath}, tipo: ${file.type}`);
 
-        console.log(
-          `🔄 Tentativo ${
-            retryCount + 1
-          }/${maxRetries} - Caricamento: ${filePath}`
-        );
+      // Carica il file tramite l'API Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(storageBucket)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: file.type,
+        });
 
-        const { data, error } = await supabase.storage
-          .from(selectedBucketName.value)
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: true,
-          });
+      if (error) throw error;
 
-        if (error) throw error;
+      // Costruisci l'URL pubblico direttamente
+      const publicUrl = `https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/${storageBucket}/${filePath}`;
 
-        const { data: urlData } = supabase.storage
-          .from(selectedBucketName.value)
-          .getPublicUrl(filePath);
-
-        if (!urlData || !urlData.publicUrl) {
-          throw new Error("URL pubblico non disponibile");
-        }
-
-        console.log("✅ Caricamento completato:", urlData.publicUrl);
-        imageUrls.push(urlData.publicUrl);
-        success = true;
-      } catch (err) {
-        retryCount++;
-        console.error(`❌ Tentativo ${retryCount}/${maxRetries} fallito:`, err);
-
-        if (retryCount >= maxRetries) {
-          console.error(`❌ Tutti i tentativi falliti per il file`);
-          throw err;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      console.log("✅ URL generato:", publicUrl);
+      imageUrls.push(publicUrl);
+    } catch (err) {
+      console.error("❌ Errore durante il caricamento:", err);
+      throw err;
     }
   }
 
   return imageUrls;
 };
 
-// Esegui il debug dello storage durante l'inizializzazione
-onMounted(async () => {
-  try {
-    isLoading.value = true;
+// Improved submitBook function
+const submitBook = async () => {
+  if (!isAuthenticated.value) {
+    errorMessage.value = "Sessione scaduta. Effettua nuovamente il login.";
+    setTimeout(() => {
+      router.push("/login");
+    }, 2000);
+    return;
+  }
 
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
-    if (authError) {
-      console.error("Authentication error:", authError);
-      errorMessage.value = "Errore durante la verifica dell'autenticazione";
+  try {
+    isSubmitting.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+
+    if (photoFiles.value.length === 0) {
+      errors.photos = "Carica almeno una foto del libro.";
+      isSubmitting.value = false;
       return;
     }
 
-    if (session) {
-      user.value = session.user;
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      errorMessage.value = validationErrors.join(". ");
+      isSubmitting.value = false;
+      return;
+    }
 
-      await debugStorageConfig();
-      await checkAndSetBucket();
-    } else {
-      console.log("Utente non autenticato");
+    // Carica le immagini direttamente senza verifiche sui bucket
+    let imageUrls;
+    try {
+      imageUrls = await uploadImages(photoFiles.value);
+      console.log("Caricamento immagini riuscito:", imageUrls);
+    } catch (uploadError) {
+      console.error("Errore nel caricamento delle immagini:", uploadError);
+      errorMessage.value =
+        "Errore nel caricamento delle immagini: " + uploadError.message;
+      isSubmitting.value = false;
+      return;
+    }
+
+    if (!imageUrls || imageUrls.length === 0) {
+      errorMessage.value = "Nessuna immagine è stata caricata. Riprova.";
+      isSubmitting.value = false;
+      return;
+    }
+
+    const finalImageUrl = imageUrls[0];
+    console.log("URL immagine finale:", finalImageUrl);
+
+    // Prepara i dati del libro
+    const bookDetails = {
+      author: bookData.author,
+      publisher:
+        bookData.publisher === "altro"
+          ? bookData.customPublisher
+          : bookData.publisher,
+      category: bookData.category,
+      condition: bookData.condition,
+      notes: bookData.notes || null,
+      shipping_available: bookData.shippingAvailable,
+      location: bookData.location,
+    };
+
+    const bookToInsert = {
+      name: bookData.title,
+      description: bookData.description,
+      price: bookData.price,
+      image_url: finalImageUrl,
+      user_id: user.value.id,
+      metadata: bookDetails,
+      status: "active",
+    };
+
+    console.log("Inserimento libro con dati:", bookToInsert);
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert([bookToInsert])
+        .select();
+
+      if (error) throw error;
+
+      successMessage.value =
+        "Libro aggiunto con successo! Verrai reindirizzato allo shop.";
+      resetForm();
+      setTimeout(() => {
+        router.push("/shop");
+      }, 2000);
+    } catch (insertError) {
+      console.error("Error with insert attempt:", insertError);
+      errorMessage.value =
+        "Errore durante l'inserimento del libro: " + insertError.message;
     }
   } catch (error) {
-    console.error("Error during initialization:", error);
-    errorMessage.value = "Si è verificato un errore: " + error.message;
+    console.error("Error submitting book:", error);
+    errorMessage.value =
+      "Si è verificato un errore: " + (error.message || "Riprova più tardi");
   } finally {
-    isLoading.value = false;
+    isSubmitting.value = false;
   }
-});
+};
 
-// Aggiungi un nuovo metodo per forzare il controllo dei bucket
-const checkBucketManually = async () => {
+// Metodo di verifica semplificato
+const verifyStorageAccess = async () => {
   errorMessage.value = "";
   successMessage.value = "";
+
   try {
-    const result = await debugStorageConfig();
-    if (result.buckets && result.buckets.length > 0) {
-      await checkAndSetBucket();
-      successMessage.value = `Bucket trovati: ${result.buckets.length}. Controlla la console per i dettagli.`;
-    } else if (result.error) {
-      errorMessage.value = `Errore nel verificare i bucket: ${result.error.message}`;
-    } else {
-      errorMessage.value = "Nessun bucket trovato nel progetto Supabase.";
+    const { data, error } = await supabase.storage
+      .from(storageBucket)
+      .list("", { limit: 1 });
+
+    if (error) {
+      console.error("❌ Errore accesso storage:", error);
+      errorMessage.value = `Errore nell'accesso al bucket "${storageBucket}": ${error.message}`;
+      return false;
     }
+
+    console.log("✅ Accesso al bucket verificato");
+    successMessage.value = `Connessione al bucket "${storageBucket}" verificata con successo.`;
+    return true;
   } catch (error) {
-    errorMessage.value = "Errore nella verifica dei bucket: " + error.message;
+    console.error("❌ Errore verifica storage:", error);
+    errorMessage.value =
+      "Errore nella verifica dello storage: " + error.message;
+    return false;
   }
 };
 
@@ -736,132 +622,6 @@ const removePhoto = (index) => {
   errors.photos = "";
 };
 
-// Improved submitBook function to match database schema
-const submitBook = async () => {
-  if (!isAuthenticated.value) {
-    errorMessage.value = "Sessione scaduta. Effettua nuovamente il login.";
-    setTimeout(() => {
-      router.push("/login");
-    }, 2000);
-    return;
-  }
-
-  try {
-    isSubmitting.value = true;
-    errorMessage.value = "";
-
-    if (photoFiles.value.length === 0) {
-      errors.photos = "Carica almeno una foto del libro.";
-      isSubmitting.value = false;
-      return;
-    }
-
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      errorMessage.value = validationErrors.join(". ");
-      isSubmitting.value = false;
-      return;
-    }
-
-    await checkAndSetBucket();
-
-    console.log(
-      "Metodo di storage:",
-      useBase64Storage.value ? "Base64" : "Supabase Storage"
-    );
-
-    let imageUrls;
-
-    try {
-      imageUrls = await uploadImages(photoFiles.value);
-      console.log("Caricamento immagini riuscito:", imageUrls);
-    } catch (uploadError) {
-      console.error("Errore nel caricamento delle immagini:", uploadError);
-      imageUrls = photoPreview.value;
-    }
-
-    const bookDetails = {
-      author: bookData.author,
-      publisher:
-        bookData.publisher === "altro"
-          ? bookData.customPublisher
-          : bookData.publisher,
-      category: bookData.category,
-      condition: bookData.condition,
-      notes: bookData.notes || null,
-      shipping_available: bookData.shippingAvailable,
-      location: bookData.location,
-    };
-
-    const bookToInsert = {
-      name: bookData.title,
-      description: bookData.description,
-      price: bookData.price,
-      image_url: imageUrls[0],
-      user_id: user.value.id,
-      metadata: bookDetails,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      status: "active",
-    };
-
-    console.log("Inserimento libro con dati:", bookToInsert);
-
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .insert([bookToInsert])
-        .select();
-
-      if (error) throw error;
-
-      successMessage.value =
-        "Libro aggiunto con successo! Verrai reindirizzato allo shop.";
-      resetForm();
-      setTimeout(() => {
-        router.push("/shop");
-      }, 2000);
-    } catch (insertError) {
-      console.error("Error with first insert attempt:", insertError);
-
-      if (insertError.message.includes("column")) {
-        const minimalProduct = {
-          name: bookData.title,
-          description: bookData.description,
-          price: bookData.price,
-          image_url: imageUrls[0],
-          user_id: user.value.id,
-        };
-
-        console.log("Trying minimal insert with:", minimalProduct);
-
-        const { data: minData, error: minError } = await supabase
-          .from("products")
-          .insert([minimalProduct])
-          .select();
-
-        if (minError) throw minError;
-
-        successMessage.value =
-          "Libro aggiunto con successo (informazioni base)! Verrai reindirizzato allo shop.";
-        resetForm();
-        setTimeout(() => {
-          router.push("/shop");
-        }, 2000);
-      } else {
-        throw insertError;
-      }
-    }
-  } catch (error) {
-    console.error("Error submitting book:", error);
-    errorMessage.value =
-      "Si è verificato un errore durante l'invio del libro: " +
-      (error.message || "Riprova più tardi.");
-  } finally {
-    isSubmitting.value = false;
-  }
-};
-
 // Form validation function
 const validateForm = () => {
   const errors = [];
@@ -905,6 +665,36 @@ const cancelForm = () => {
     router.push("/shop");
   }
 };
+
+// Verifica la sessione utente all'avvio della pagina
+onMounted(async () => {
+  try {
+    isLoading.value = true;
+
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession();
+    if (authError) {
+      console.error("Authentication error:", authError);
+      errorMessage.value = "Errore durante la verifica dell'autenticazione";
+      return;
+    }
+
+    if (session) {
+      user.value = session.user;
+      // Verifica l'accesso allo storage ma non blocca il componente
+      await verifyStorageAccess();
+    } else {
+      console.log("Utente non autenticato");
+    }
+  } catch (error) {
+    console.error("Error during initialization:", error);
+    errorMessage.value = "Si è verificato un errore: " + error.message;
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <style scoped>

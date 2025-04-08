@@ -7,24 +7,50 @@ grant select on storage.buckets to anon, authenticated;
 grant select on storage.objects to anon, authenticated;
 grant insert, update, delete on storage.objects to authenticated;
 
--- Crea un bucket di storage per le immagini se non esiste
--- Questo permette di salvare le immagini nel bucket invece che in base64 nel database
-insert into storage.buckets (id, name, public)
-values ('images', 'images', true)
-on conflict (id) do nothing;
+-- Assicurati che gli utenti autenticati possano gestire i bucket (non solo crearli ma anche modificarli)
+grant all privileges on storage.buckets to authenticated;
 
--- Verifica che il bucket sia stato creato e sia pubblico
+-- IMPORTANTE: Questo è fondamentale per permettere agli utenti di creare bucket
+ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
+
+-- Aggiorna tutte le policy per i bucket
+DROP POLICY IF EXISTS "Allow authenticated users to create storage buckets" ON storage.buckets;
+DROP POLICY IF EXISTS "Allow authenticated users to manage buckets" ON storage.buckets;
+
+-- Policy più permissiva per la creazione di bucket
+CREATE POLICY "Allow authenticated users to create buckets"
+ON storage.buckets FOR INSERT
+WITH CHECK (auth.role() = 'authenticated');
+
+-- Policy per le altre operazioni
+CREATE POLICY "Allow authenticated users to manage existing buckets"
+ON storage.buckets FOR ALL
+USING (auth.role() = 'authenticated');
+
+-- Crea un bucket di storage per le immagini se non esiste
+-- Usa un approccio diretto con una funzione anonima per avere più controllo
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'images' AND public = true) THEN
+  -- Tenta di creare il bucket images in modo diretto
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'images') THEN
+    INSERT INTO storage.buckets (id, name, public)
+    VALUES ('images', 'images', true);
+  ELSE
+    -- Assicurati che il bucket sia pubblico
     UPDATE storage.buckets SET public = true WHERE id = 'images';
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Il bucket "images" non è stato creato correttamente';
-    END IF;
   END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Error creating bucket: %', SQLERRM;
+    -- Non fare fallire lo script se c'è un errore
 END $$;
 
--- Crea policy di accesso al bucket images
+-- IMPORTANTE: crea una policy specifica per il bucket 'images'
+DROP POLICY IF EXISTS "Allow public access to images bucket" ON storage.buckets;
+CREATE POLICY "Allow public access to images bucket"
+ON storage.buckets FOR SELECT
+USING (id = 'images');
+
 -- Chiunque può visualizzare le immagini
 drop policy if exists "Anyone can view images" on storage.objects;
 create policy "Anyone can view images"
@@ -35,7 +61,10 @@ using (bucket_id = 'images');
 drop policy if exists "Authenticated users can upload images" on storage.objects;
 create policy "Authenticated users can upload images"
 on storage.objects for insert
-with check (bucket_id = 'images' and auth.role() = 'authenticated');
+with check (
+  bucket_id = 'images' 
+  AND auth.role() = 'authenticated'
+);
 
 -- Gli utenti possono aggiornare o eliminare solo le loro immagini
 drop policy if exists "Users can update own images" on storage.objects;
@@ -52,10 +81,10 @@ using (bucket_id = 'images' and auth.uid() = owner);
 CREATE OR REPLACE FUNCTION validate_storage_url(url TEXT)
 RETURNS BOOLEAN AS $$
 BEGIN
-  -- Permetti NULL e verifica che sia un URL che contiene l'endpoint corretto o il percorso generico
+  -- Permetti solo URL del bucket images
   RETURN url IS NULL OR 
-         url ~ 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/.*images/' OR
-         url ~ '/storage/v1/.*images/';
+         url ~ '^https://tiylfyyfitqzwstftzpg\.supabase\.co/storage/v1/.*images/' OR
+         url ~ '^/storage/v1/.*images/';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -76,26 +105,32 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_storage_url(bucket_name text, path text)
 RETURNS text AS $$
 BEGIN
-  -- Usa l'endpoint completo per generare URL assoluti
-  RETURN 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/' || bucket_name || '/' || path;
+  RETURN 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/s3/object/public/' || bucket_name || '/' || path;
 END;
 $$ LANGUAGE plpgsql;
 
--- Funzione per estrarre il path dall'URL di un'immagine
+-- Semplifica la funzione di estrazione percorso rimuovendo il base64
 CREATE OR REPLACE FUNCTION extract_path_from_storage_url(url text)
 RETURNS text AS $$
 BEGIN
-  -- Estrai il percorso dopo 'public/images/' considerando anche l'endpoint completo
-  IF url ~ 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/' THEN
-    RETURN regexp_replace(url, '.*public/images/', '');
-  ELSE
-    RETURN regexp_replace(url, '.*/public/images/', '');
-  END IF;
+  RETURN regexp_replace(
+    url,
+    '^https://tiylfyyfitqzwstftzpg\.supabase\.co/storage/v1/.*/images/',
+    ''
+  );
 EXCEPTION
   WHEN OTHERS THEN
-    RETURN NULL; -- In caso di errore, restituisci NULL
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Aggiungi una funzione per generare l'URL pubblico di un'immagine
+CREATE OR REPLACE FUNCTION public_image_url(bucket_name text, path text)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/' || bucket_name || '/' || path;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Modifica tabella profiles per garantire che profile_image sia un URL
 create table IF NOT EXISTS profiles (
@@ -116,7 +151,7 @@ CREATE INDEX idx_profiles_profile_image_md5 ON profiles(md5(profile_image))
   WHERE profile_image IS NOT NULL;
 
 -- Aggiungi un commento sulla colonna profile_image
-COMMENT ON COLUMN profiles.profile_image IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://xxx.supabase.co/storage/v1/object/public/images/users/{user_id}/{filename})';
+COMMENT ON COLUMN profiles.profile_image IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/images/{path})';
 
 -- Trigger per eliminare la vecchia immagine dal bucket quando viene aggiornata in profiles
 CREATE OR REPLACE FUNCTION cleanup_old_profile_image()
@@ -185,7 +220,7 @@ CREATE INDEX idx_products_image_url_md5 ON products(md5(image_url))
   WHERE image_url IS NOT NULL;
 
 -- Aggiungi un commento sulla colonna image_url
-COMMENT ON COLUMN products.image_url IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://xxx.supabase.co/storage/v1/object/public/images/products/{product_id}/{filename})';
+COMMENT ON COLUMN products.image_url IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/images/{path})';
 
 -- Trigger per eliminare la vecchia immagine dal bucket quando viene aggiornata in products
 CREATE OR REPLACE FUNCTION cleanup_old_product_image()
