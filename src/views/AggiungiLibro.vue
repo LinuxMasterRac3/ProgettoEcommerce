@@ -491,13 +491,8 @@ const submitBook = async () => {
       return;
     }
 
-    // Usa la prima immagine come copertina principale
-    const mainImageUrl = imageUrls[0];
-    console.log("URL immagine principale:", mainImageUrl);
-
-    // Salva solo le immagini aggiuntive nei metadati (dalla seconda in poi)
-    const additionalImages = imageUrls.slice(1);
-    console.log("URLs immagini aggiuntive:", additionalImages);
+    // Salviamo tutte le immagini nei metadata in un array 'additional_images'
+    console.log("URLs immagini caricate:", imageUrls);
 
     // Prepara i dati del libro
     const bookDetails = {
@@ -511,14 +506,13 @@ const submitBook = async () => {
       notes: bookData.notes || null,
       shipping_available: bookData.shippingAvailable,
       location: bookData.location,
-      additional_images: additionalImages, // Solo le immagini aggiuntive
+      additional_images: imageUrls, // Modifica: usa additional_images anziché images
     };
 
     const bookToInsert = {
       name: bookData.title,
       description: bookData.description,
       price: bookData.price,
-      image_url: mainImageUrl, // Prima immagine come copertina principale
       user_id: user.value.id,
       metadata: bookDetails,
       status: "active",

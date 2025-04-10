@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "../../components/Navbar.vue";
@@ -11,18 +11,10 @@ interface Book {
   name: string;
   description: string;
   price: number;
-  image_url?: string;
   discountPercentage?: number;
   rating?: number;
   reviewCount?: number;
   created_at?: string;
-  author?: string;
-  publisher?: string;
-  condition?: string;
-  pages?: number;
-  language?: string;
-  isbn?: string;
-  category?: string;
   user_id?: string;
   metadata?: {
     notes?: string;
@@ -87,6 +79,28 @@ const seller = ref<User | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 
+// Computed property per ottenere l'immagine principale
+const mainImage = computed(() => {
+  if (
+    product.value?.metadata?.additional_images &&
+    product.value.metadata.additional_images.length > 0
+  ) {
+    return product.value.metadata.additional_images[0];
+  }
+  return "https://placehold.co/300x400?text=No+Image";
+});
+
+// Computed property per ottenere le immagini aggiuntive
+const additionalImages = computed(() => {
+  if (
+    product.value?.metadata?.additional_images &&
+    product.value.metadata.additional_images.length > 1
+  ) {
+    return product.value.metadata.additional_images.slice(1);
+  }
+  return [];
+});
+
 // Fetch product details
 const fetchProductDetails = async () => {
   isLoading.value = true;
@@ -107,18 +121,10 @@ const fetchProductDetails = async () => {
         name: productData.name || "Titolo non disponibile",
         description: productData.description || "Descrizione non disponibile",
         price: parseFloat(productData.price) || 0,
-        image_url: productData.image_url,
         discountPercentage: productData.discount_percentage,
         rating: productData.rating,
         reviewCount: productData.review_count,
         created_at: productData.created_at,
-        author: productData.author,
-        publisher: productData.publisher,
-        condition: productData.condition,
-        pages: productData.pages,
-        language: productData.language,
-        isbn: productData.isbn,
-        category: productData.category,
         user_id: productData.user_id,
         metadata: productData.metadata || {},
       };
@@ -197,15 +203,15 @@ onMounted(() => {
           <div class="product-images">
             <div class="product-thumbnails">
               <img
-                v-for="n in 4"
-                :key="n"
-                :src="product.image_url"
+                v-for="(image, index) in product.metadata?.additional_images ||
+                []"
+                :key="index"
+                :src="image"
                 alt="Thumbnail"
                 class="product-thumbnail" />
             </div>
             <img
-              v-if="product.image_url"
-              :src="product.image_url"
+              :src="mainImage"
               alt="Immagine prodotto"
               class="product-main-image" />
           </div>
@@ -214,7 +220,7 @@ onMounted(() => {
           <div class="product-info">
             <h1 class="product-title">{{ product.name }}</h1>
             <p class="product-author">
-              di {{ product.author || "Autore sconosciuto" }}
+              di {{ product.metadata?.author || "Autore sconosciuto" }}
             </p>
             <p class="product-price">Prezzo: €{{ product.price.toFixed(2) }}</p>
             <div class="product-buttons">
@@ -264,15 +270,15 @@ onMounted(() => {
             <li><strong>Posizione:</strong> {{ product.metadata.location }}</li>
             <li>
               <strong>Spedizione Disponibile:</strong>
-              {{ product.metadata.shipping_available }}
+              {{ product.metadata.shipping_available ? "Sì" : "No" }}
             </li>
           </ul>
           <div
             class="additional-images"
-            v-if="product.metadata.additional_images?.length">
+            v-if="additionalImages.length">
             <h3>Immagini aggiuntive</h3>
             <div
-              v-for="(url, index) in product.metadata.additional_images"
+              v-for="(url, index) in additionalImages"
               :key="index">
               <img
                 :src="url"
@@ -290,7 +296,7 @@ onMounted(() => {
               :key="n"
               class="related-product-card">
               <img
-                :src="product.image_url"
+                :src="mainImage"
                 alt="Prodotto correlato"
                 class="related-product-image" />
               <p class="related-product-name">Nome prodotto</p>
@@ -322,15 +328,6 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
-Nome prodotto
-
-€20.00
-Prodotto correlato
-
-Nome prodotto
-
-€20.00
-
 
 /* Product details */
 .product-detail-container {

@@ -254,14 +254,13 @@ create policy "Users can insert their own profile"
   on profiles for insert 
   with check (auth.uid() = id);
 
--- Modifica tabella products per garantire che image_url sia un URL
+-- Modifica tabella products per rimuovere completamente image_url
 DROP TABLE IF EXISTS products CASCADE;  
 create table products (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
   description text,
   price decimal not null,
-  image_url text CHECK (validate_storage_url(image_url)),
   user_id uuid references auth.users not null,
   metadata jsonb,
   status text default 'active',
@@ -269,44 +268,15 @@ create table products (
   updated_at timestamp with time zone default now()
 );
 
--- Usa un indice MD5 anche qui per la performance ed evitare errori di dimensione
-CREATE INDEX idx_products_image_url_md5 ON products(md5(image_url))
-  WHERE image_url IS NOT NULL;
+-- Rimuovi l'indice sulla colonna image_url
+DROP INDEX IF EXISTS idx_products_image_url_md5;
 
--- Aggiungi un commento sulla colonna image_url
-COMMENT ON COLUMN products.image_url IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/images/{path})';
-
--- Trigger per eliminare la vecchia immagine dal bucket quando viene aggiornata in products
-CREATE OR REPLACE FUNCTION cleanup_old_product_image()
-RETURNS TRIGGER AS $$
-DECLARE
-  old_path text;
-BEGIN
-  -- Se c'è una nuova immagine e c'era già un'immagine precedente
-  IF NEW.image_url IS DISTINCT FROM OLD.image_url AND OLD.image_url IS NOT NULL THEN
-    old_path := extract_path_from_storage_url(OLD.image_url);
-    
-    -- Se il percorso è valido, elimina l'oggetto
-    IF old_path IS NOT NULL THEN
-      -- Usa una funzione di supporto esterna o un'estensione come pg_net per chiamare l'API di Storage
-      -- In alternativa, l'applicazione client dovrebbe occuparsi di eliminare i file obsoleti
-      -- Qui si potrebbe registrare l'eliminazione in una tabella di manutenzione
-      INSERT INTO storage_cleanup_queue(object_path, deleted_at, status)
-      VALUES ('images/' || old_path, now(), 'pending');
-    END IF;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Collega il trigger alla tabella products
+-- Rimuovi il trigger per la pulizia delle immagini vecchie dato che ora usiamo metadata
 DROP TRIGGER IF EXISTS product_image_cleanup_trigger ON products;
-CREATE TRIGGER product_image_cleanup_trigger
-BEFORE UPDATE ON products
-FOR EACH ROW
-WHEN (NEW.image_url IS DISTINCT FROM OLD.image_url)
-EXECUTE FUNCTION cleanup_old_product_image();
+DROP FUNCTION IF EXISTS cleanup_old_product_image();
+
+-- Commento sulla struttura metadata per documentare il formato atteso
+COMMENT ON COLUMN products.metadata IS 'Contiene dettagli aggiuntivi come: author, publisher, category, condition, notes, shipping_available, location, additional_images (array di URL delle immagini)';
 
 -- Trigger per aggiornare timestamp updated_at quando si modifica un prodotto
 CREATE OR REPLACE FUNCTION update_modified_column()

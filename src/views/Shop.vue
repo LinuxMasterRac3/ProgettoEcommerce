@@ -75,10 +75,19 @@ interface Book {
   name: string;
   description: string;
   price: number;
-  image_url?: string;
   discountPercentage?: number;
   rating?: number;
   reviewCount?: number;
+  metadata?: {
+    notes?: string;
+    author?: string;
+    category?: string;
+    location?: string;
+    condition?: string;
+    publisher?: string;
+    additional_images?: string[];
+    shipping_available?: boolean;
+  };
 }
 
 // Supabase configuration
@@ -128,10 +137,10 @@ const fetchRecentBooks = async () => {
         name: item.name || "Titolo non disponibile",
         description: item.description || "Descrizione non disponibile",
         price: parseFloat(item.price) || 0,
-        image_url: item.image_url,
         discountPercentage: item.discount_percentage,
         rating: item.rating,
         reviewCount: item.review_count,
+        metadata: item.metadata || {},
       }));
     } else {
       recentBooks.value = [];
@@ -155,7 +164,9 @@ const getPlaceholderBooks = (): Book[] => {
       name: "Harry Potter e la Pietra Filosofale",
       description: "Il primo libro della saga di Harry Potter",
       price: 15.99,
-      image_url: "https://placehold.co/300x200?text=Harry+Potter",
+      metadata: {
+        additional_images: ["https://placehold.co/300x400?text=Harry+Potter"],
+      },
       discountPercentage: 10,
       rating: 4.8,
       reviewCount: 123,
@@ -165,7 +176,11 @@ const getPlaceholderBooks = (): Book[] => {
       name: "Il Signore degli Anelli",
       description: "La storia epica di Frodo e dell'anello",
       price: 25.99,
-      image_url: "https://placehold.co/300x200?text=Il+Signore+degli+Anelli",
+      metadata: {
+        additional_images: [
+          "https://placehold.co/300x200?text=Il+Signore+degli+Anelli",
+        ],
+      },
       discountPercentage: 0,
       rating: 4.9,
       reviewCount: 256,
@@ -175,7 +190,9 @@ const getPlaceholderBooks = (): Book[] => {
       name: "IT",
       description: "Il terrificante romanzo di Stephen King",
       price: 19.5,
-      image_url: "https://placehold.co/300x200?text=IT",
+      metadata: {
+        additional_images: ["https://placehold.co/300x200?text=IT"],
+      },
       discountPercentage: 15,
       rating: 4.6,
       reviewCount: 98,
@@ -185,7 +202,11 @@ const getPlaceholderBooks = (): Book[] => {
       name: "Diario di una Schiappa",
       description: "Le avventure di Greg Heffley",
       price: 12.9,
-      image_url: "https://placehold.co/300x200?text=Diario+di+una+Schiappa",
+      metadata: {
+        additional_images: [
+          "https://placehold.co/300x200?text=Diario+di+una+Schiappa",
+        ],
+      },
       discountPercentage: 5,
       rating: 4.3,
       reviewCount: 87,
@@ -195,7 +216,9 @@ const getPlaceholderBooks = (): Book[] => {
       name: "Norwegian Wood",
       description: "Un romanzo di Haruki Murakami",
       price: 18.5,
-      image_url: "https://placehold.co/300x200?text=Norwegian+Wood",
+      metadata: {
+        additional_images: ["https://placehold.co/300x200?text=Norwegian+Wood"],
+      },
       discountPercentage: 0,
       rating: 4.7,
       reviewCount: 64,
@@ -275,7 +298,6 @@ onMounted(() => {
     <main>
       <div class="content-container">
         <!-- Hero Banner / Slider -->
-
         <div class="hero-banner">
           <div
             class="slider"
@@ -316,6 +338,7 @@ onMounted(() => {
             ❯
           </button>
         </div>
+
         <!-- Search Section -->
         <div class="search-section">
           <div class="search-container">
@@ -401,8 +424,9 @@ onMounted(() => {
               <div
                 class="product-image"
                 :style="
-                  book.image_url
-                    ? `background-image: url(${book.image_url}); background-size: cover;`
+                  book.metadata?.additional_images &&
+                  book.metadata.additional_images.length > 0
+                    ? `background-image: url(${book.metadata.additional_images[0]}); background-size: cover;`
                     : ''
                 "
                 @click="viewProductDetails(book.id)">
@@ -699,24 +723,110 @@ nav.nav-buttons {
 
 /* Hero Banner Styles */
 .hero-banner {
-  background-color: #eef1ff;
-  height: 180px;
+  position: relative;
+  overflow: hidden;
   border-radius: 10px;
+  height: 330px; /* Altezza dello slider */
+  margin-top: -45px; /* Ridotto il margine superiore */
+}
+
+.slider-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-decoration: none; /* Rimuove la sottolineatura */
+}
+
+.slider-link:hover {
+  text-decoration: none; /* Rimuove la sottolineatura al passaggio del mouse */
+}
+
+.slider {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  margin-bottom: 30px;
+  transition: transform 0.5s ease-in-out;
+  transform: translateX(calc(-100% * var(--current-slide, 0)));
+}
+
+.slide {
+  min-width: 100%;
+  flex-shrink: 0;
+}
+
+.slide-image {
+  width: 100%;
+  height: 100%; /* L'immagine occupa tutta l'altezza dello slider */
+  object-fit: cover; /* Assicura che l'immagine si adatti senza deformarsi */
+  border-radius: 10px;
+}
+
+.slider-text {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 10; /* Assicura che le scritte siano sopra gli altri elementi */
+  color: white;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.5
+  ); /* Sfondo semi-trasparente per migliorare la leggibilità */
+  padding: 10px 15px; /* Aggiunge spazio interno */
+  border-radius: 8px; /* Arrotonda gli angoli */
 }
 
 .slider-content {
-  color: #394263; /* Molto più scuro rispetto al precedente #a5b0d6 */
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  color: white;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
 }
 
 .slider-title {
-  font-size: 28px;
-  font-weight: 400;
-  margin-bottom: 10px;
+  font-size: 32px; /* Aumentata la dimensione del titolo */
+  font-weight: 700; /* Reso più audace */
+  margin-bottom: 15px;
+  color: #ffffff; /* Colore bianco per contrasto */
+  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
+}
+
+.slider-description {
+  font-size: 18px; /* Aumentata la dimensione del testo */
+  font-weight: 400; /* Reso più leggibile */
+  color: #f0f0f0; /* Colore leggermente più chiaro */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
+  line-height: 1.5; /* Migliorata la leggibilità */
+}
+
+.prev-button,
+.next-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%); /* Centra verticalmente */
+  background-color: rgba(0, 0, 0, 0.8); /* Colore nero più scuro */
+  color: white;
+  border: none;
+  padding: 0; /* Rimuove padding extra */
+  cursor: pointer;
+  border-radius: 50%;
+  z-index: 10;
+  font-size: 24px; /* Aumenta la dimensione della freccia */
+  width: 47px; /* Dimensione del pulsante */
+  height: 47px; /* Dimensione del pulsante */
+  display: flex;
+  align-items: center; /* Centra verticalmente il contenuto */
+  justify-content: center; /* Centra orizzontalmente il contenuto */
+  line-height: 0; /* Rimuove eventuali spazi extra */
+}
+
+.prev-button {
+  left: 15px; /* Posiziona la freccia a sinistra */
+}
+
+.next-button {
+  right: 15px; /* Posiziona la freccia a destra */
 }
 
 /* Search Section Styles */
@@ -726,6 +836,7 @@ nav.nav-buttons {
 
 .search-container {
   display: flex;
+  flex-direction: column;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   padding: 20px;
@@ -1003,112 +1114,6 @@ nav.nav-buttons {
 .publisher-name {
   font-size: 14px;
   font-weight: 500; /* Aggiunto peso del font per migliorare leggibilità */
-}
-
-/*Style slider*/
-
-.hero-banner {
-  position: relative;
-  overflow: hidden;
-  border-radius: 10px;
-  height: 330px; /* Altezza dello slider */
-  margin-top: -45px; /* Ridotto il margine superiore */
-}
-
-.slider-link {
-  display: block;
-  width: 100%;
-  height: 100%;
-  text-decoration: none; /* Rimuove la sottolineatura */
-}
-.slider-link:hover {
-  text-decoration: none; /* Rimuove la sottolineatura al passaggio del mouse */
-}
-
-.slider {
-  display: flex;
-  transition: transform 0.5s ease-in-out;
-  transform: translateX(calc(-100% * var(--current-slide, 0)));
-}
-
-.slide {
-  min-width: 100%;
-  flex-shrink: 0;
-}
-
-.slide-image {
-  width: 100%;
-  height: 100%; /* L'immagine occupa tutta l'altezza dello slider */
-  object-fit: cover; /* Assicura che l'immagine si adatti senza deformarsi */
-  border-radius: 10px;
-}
-.slider-text {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 10; /* Assicura che le scritte siano sopra gli altri elementi */
-  color: white;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
-  background-color: rgba(
-    0,
-    0,
-    0,
-    0.5
-  ); /* Sfondo semi-trasparente per migliorare la leggibilità */
-  padding: 10px 15px; /* Aggiunge spazio interno */
-  border-radius: 8px; /* Arrotonda gli angoli */
-}
-.slider-content {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  color: white;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
-}
-
-.slider-title {
-  font-size: 32px; /* Aumentata la dimensione del titolo */
-  font-weight: 700; /* Reso più audace */
-  margin-bottom: 15px;
-  color: #ffffff; /* Colore bianco per contrasto */
-  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
-}
-
-.slider-description {
-  font-size: 18px; /* Aumentata la dimensione del testo */
-  font-weight: 400; /* Reso più leggibile */
-  color: #f0f0f0; /* Colore leggermente più chiaro */
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
-  line-height: 1.5; /* Migliorata la leggibilità */
-}
-
-.prev-button,
-.next-button {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%); /* Centra verticalmente */
-  background-color: rgba(0, 0, 0, 0.8); /* Colore nero più scuro */
-  color: white;
-  border: none;
-  padding: 0; /* Rimuove padding extra */
-  cursor: pointer;
-  border-radius: 50%;
-  z-index: 10;
-  font-size: 24px; /* Aumenta la dimensione della freccia */
-  width: 47px; /* Dimensione del pulsante */
-  height: 47px; /* Dimensione del pulsante */
-  display: flex;
-  align-items: center; /* Centra verticalmente il contenuto */
-  justify-content: center; /* Centra orizzontalmente il contenuto */
-  line-height: 0; /* Rimuove eventuali spazi extra */
-}
-
-.prev-button {
-  left: 15px; /* Posiziona la freccia a sinistra */
-}
-
-.next-button {
-  right: 15px; /* Posiziona la freccia a destra */
 }
 
 /* Responsive Styles */
