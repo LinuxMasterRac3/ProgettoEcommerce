@@ -272,7 +272,11 @@
                     <span class="comune-name">{{ comune.nome }}</span>
                     <span
                       class="provincia-sigla"
-                      v-if="comune.provincia && comune.provincia.sigla">
+                      v-if="
+                        comune.provincia &&
+                        comune.provincia.sigla &&
+                        comune.provincia.sigla.length === 2
+                      ">
                       ({{ comune.provincia.sigla }})
                     </span>
                   </div>
@@ -426,28 +430,84 @@ const selectedSuggestionIndex = ref(-1);
 const isLoadingComuni = ref(false);
 const comuniError = ref(null);
 
+// Database di province per comuni principali italiani
+const provinceMap = {
+  Roma: { nome: "Roma", sigla: "RM" },
+  Milano: { nome: "Milano", sigla: "MI" },
+  Napoli: { nome: "Napoli", sigla: "NA" },
+  Torino: { nome: "Torino", sigla: "TO" },
+  Palermo: { nome: "Palermo", sigla: "PA" },
+  Genova: { nome: "Genova", sigla: "GE" },
+  Bologna: { nome: "Bologna", sigla: "BO" },
+  Firenze: { nome: "Firenze", sigla: "FI" },
+  Bari: { nome: "Bari", sigla: "BA" },
+  Catania: { nome: "Catania", sigla: "CT" },
+  Venezia: { nome: "Venezia", sigla: "VE" },
+  Verona: { nome: "Verona", sigla: "VR" },
+  Messina: { nome: "Messina", sigla: "ME" },
+  Padova: { nome: "Padova", sigla: "PD" },
+  Trieste: { nome: "Trieste", sigla: "TS" },
+  Taranto: { nome: "Taranto", sigla: "TA" },
+  Brescia: { nome: "Brescia", sigla: "BS" },
+  Parma: { nome: "Parma", sigla: "PR" },
+  Prato: { nome: "Prato", sigla: "PO" },
+  Modena: { nome: "Modena", sigla: "MO" },
+  "Reggio Calabria": { nome: "Reggio Calabria", sigla: "RC" },
+  "Reggio Emilia": { nome: "Reggio Emilia", sigla: "RE" },
+  Perugia: { nome: "Perugia", sigla: "PG" },
+  Livorno: { nome: "Livorno", sigla: "LI" },
+  Ravenna: { nome: "Ravenna", sigla: "RA" },
+  Cagliari: { nome: "Cagliari", sigla: "CA" },
+  Foggia: { nome: "Foggia", sigla: "FG" },
+  Salerno: { nome: "Salerno", sigla: "SA" },
+  Rimini: { nome: "Rimini", sigla: "RN" },
+  Ferrara: { nome: "Ferrara", sigla: "FE" },
+  Sassari: { nome: "Sassari", sigla: "SS" },
+  Latina: { nome: "Latina", sigla: "LT" },
+  "Giugliano in Campania": { nome: "Napoli", sigla: "NA" },
+  Monza: { nome: "Monza e della Brianza", sigla: "MB" },
+  Siracusa: { nome: "Siracusa", sigla: "SR" },
+  Pescara: { nome: "Pescara", sigla: "PE" },
+  Bergamo: { nome: "Bergamo", sigla: "BG" },
+  Forlì: { nome: "Forlì-Cesena", sigla: "FC" },
+  Vicenza: { nome: "Vicenza", sigla: "VI" },
+  Trento: { nome: "Trento", sigla: "TN" },
+  Terni: { nome: "Terni", sigla: "TR" },
+  Bolzano: { nome: "Bolzano/Bozen", sigla: "BZ" },
+  Novara: { nome: "Novara", sigla: "NO" },
+  Ancona: { nome: "Ancona", sigla: "AN" },
+  Andria: { nome: "Barletta-Andria-Trani", sigla: "BT" },
+  Piacenza: { nome: "Piacenza", sigla: "PC" },
+  Udine: { nome: "Udine", sigla: "UD" },
+  Arezzo: { nome: "Arezzo", sigla: "AR" },
+  Cesena: { nome: "Forlì-Cesena", sigla: "FC" },
+  Lecce: { nome: "Lecce", sigla: "LE" },
+  Pesaro: { nome: "Pesaro e Urbino", sigla: "PU" },
+  Alessandria: { nome: "Alessandria", sigla: "AL" },
+  Barletta: { nome: "Barletta-Andria-Trani", sigla: "BT" },
+  "La Spezia": { nome: "La Spezia", sigla: "SP" },
+  Catanzaro: { nome: "Catanzaro", sigla: "CZ" },
+  Pistoia: { nome: "Pistoia", sigla: "PT" },
+  Caserta: { nome: "Caserta", sigla: "CE" },
+  Como: { nome: "Como", sigla: "CO" },
+  Lucca: { nome: "Lucca", sigla: "LU" },
+  Treviso: { nome: "Treviso", sigla: "TV" },
+  Monza: { nome: "Monza e della Brianza", sigla: "MB" },
+  Varese: { nome: "Varese", sigla: "VA" },
+};
+
 // Carica i comuni italiani
 const fetchComuni = async () => {
-  if (comuni.value.length > 0) return;
-
   try {
     isLoadingComuni.value = true;
     comuniError.value = null;
 
-    // Utilizziamo una cache locale per evitare troppe chiamate all'API
-    const cachedComuni = localStorage.getItem("comuni-cache");
-    const cacheTimestamp = localStorage.getItem("comuni-cache-timestamp");
-    const cacheIsValid =
-      cacheTimestamp && Date.now() - parseInt(cacheTimestamp) < 86400000; // 24 ore
+    // Forziamo il ricaricamento dei dati per risolvere il problema dei punti interrogativi
+    localStorage.removeItem("comuni-cache");
+    localStorage.removeItem("comuni-cache-timestamp");
 
-    if (cachedComuni && cacheIsValid) {
-      comuni.value = JSON.parse(cachedComuni);
-      console.log(
-        `Caricati ${comuni.value.length} comuni italiani dalla cache`
-      );
-      return;
-    }
-
+    // Tentativo di ottenere i dati da API
+    console.log("Caricamento comuni da API...");
     const response = await fetch(
       "https://raw.githubusercontent.com/matteocontrini/comuni-json/master/comuni.json"
     );
@@ -456,25 +516,80 @@ const fetchComuni = async () => {
     }
 
     const data = await response.json();
+    console.log(`Ricevuti ${data.length} comuni dall'API`);
 
-    // Verifica e normalizza i dati per assicurarsi che abbiano la struttura corretta
-    const normalizedData = data.map((comune) => {
-      // Se il comune ha province non definite correttamente, assegna valori di default
-      if (!comune.provincia || !comune.provincia.sigla) {
-        console.warn(`Comune senza provincia: ${comune.nome}`);
-        comune.provincia = comune.provincia || {};
-        comune.provincia.nome = comune.provincia.nome || "Sconosciuta";
-        comune.provincia.sigla = comune.provincia.sigla || "??";
+    // Pulizia e normalizzazione più aggressiva dei dati
+    const normalizedData = data
+      .filter((comune) => comune && comune.nome) // Filtra solo comuni validi con un nome
+      .map((comune) => {
+        // Controllo se il comune è nel nostro database di province
+        const comuneName = comune.nome.trim();
+        if (provinceMap[comuneName]) {
+          // Sostituisci con la provincia corretta dal nostro database
+          comune.provincia = {
+            nome: provinceMap[comuneName].nome,
+            sigla: provinceMap[comuneName].sigla,
+          };
+          return comune;
+        }
+
+        // Gestisci i casi in cui la provincia non è definita correttamente
+        if (
+          !comune.provincia ||
+          !comune.provincia.sigla ||
+          comune.provincia.sigla === "??" ||
+          comune.provincia.sigla.length !== 2
+        ) {
+          // Prova a estrarre la provincia dal nome (es. "Comune (PR)")
+          const provinceMatch = comune.nome.match(/\s*\(([A-Z]{2})\)\s*$/);
+          if (provinceMatch && provinceMatch[1]) {
+            comune.provincia = {
+              nome: "Provincia di " + provinceMatch[1],
+              sigla: provinceMatch[1],
+            };
+            return comune;
+          }
+
+          // Cerca di dedurre la provincia dal nome del comune
+          for (const [city, province] of Object.entries(provinceMap)) {
+            // Se il nome del comune contiene la città chiave
+            if (
+              comune.nome.includes(city) ||
+              comune.nome.startsWith(city + " ")
+            ) {
+              comune.provincia = {
+                nome: province.nome,
+                sigla: province.sigla,
+              };
+              return comune;
+            }
+          }
+
+          // Se non riusciamo a determinare la provincia, imposta un valore generico
+          comune.provincia = {
+            nome: "Provincia non specificata",
+            sigla: "", // Stringa vuota invece di "??"
+          };
+        }
+
+        return comune;
+      });
+
+    // Ulteriore verifica per assicurarci che non rimangano punti interrogativi
+    for (const comune of normalizedData) {
+      if (comune.provincia && comune.provincia.sigla === "??") {
+        console.warn(`Rimozione sigla ?? per ${comune.nome}`);
+        comune.provincia.sigla = "";
       }
-      return comune;
-    });
+    }
 
     comuni.value = normalizedData;
 
-    // Salva i dati in cache
+    // Salva i dati puliti in cache
     try {
       localStorage.setItem("comuni-cache", JSON.stringify(normalizedData));
       localStorage.setItem("comuni-cache-timestamp", Date.now().toString());
+      console.log("Comuni salvati in cache");
     } catch (e) {
       console.warn("Impossibile salvare i comuni in cache:", e);
     }
@@ -526,18 +641,28 @@ const handleLocationInput = () => {
   showSuggestions.value = true;
 };
 
-// Gestisce la selezione di un comune dai suggerimenti
+// Gestisce la selezione di un comune dai suggerimenti con sigla corretta
 const selectSuggestion = (index) => {
   if (index >= 0 && index < filteredComuni.value.length) {
     const selectedComune = filteredComuni.value[index];
 
-    // Verifica che l'oggetto provincia esista e abbia la proprietà sigla
-    if (selectedComune.provincia && selectedComune.provincia.sigla) {
+    // Verifico se il comune è nel database principale
+    if (provinceMap[selectedComune.nome]) {
+      const provinciaCorretta = provinceMap[selectedComune.nome];
+      locationInput.value = `${selectedComune.nome} (${provinciaCorretta.sigla})`;
+    }
+    // Altrimenti usa i dati presenti se validi
+    else if (
+      selectedComune.provincia &&
+      selectedComune.provincia.sigla &&
+      selectedComune.provincia.sigla.length === 2 &&
+      selectedComune.provincia.sigla !== "??"
+    ) {
       locationInput.value = `${selectedComune.nome} (${selectedComune.provincia.sigla})`;
-    } else {
-      // Fallback nel caso in cui la struttura dei dati non sia come previsto
+    }
+    // Fallback: usa solo il nome del comune
+    else {
       locationInput.value = selectedComune.nome;
-      console.warn("Dati provincia mancanti per il comune:", selectedComune);
     }
 
     bookData.location = locationInput.value;
@@ -571,6 +696,14 @@ const handleLocationBlur = () => {
 
   // Aggiorna bookData.location con l'input corrente
   bookData.location = locationInput.value;
+};
+
+// Funzione per forzare il ricaricamento dei comuni (utile per debug)
+const forceReloadComuni = () => {
+  localStorage.removeItem("comuni-cache");
+  localStorage.removeItem("comuni-cache-timestamp");
+  comuni.value = [];
+  fetchComuni();
 };
 
 // State for photos
@@ -842,6 +975,9 @@ onMounted(async () => {
     } else {
       console.log("Utente non autenticato");
     }
+
+    // Forza il ricaricamento per pulire i dati problematici
+    forceReloadComuni();
 
     // Carica i comuni italiani
     await fetchComuni();

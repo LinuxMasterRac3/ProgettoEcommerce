@@ -12,7 +12,7 @@
         >Aggiungi Libro +</RouterLink
       >
       <RouterLink
-        to="/favorites"
+        to="/wishlist"
         class="icon"
         >❤️</RouterLink
       >
