@@ -83,6 +83,11 @@ const router = createRouter({
       name: "addbook",
       component: () => import("../views/AggiungiLibro.vue"),
     },
+    {
+      path: "/allbooks",
+      name: "allbooks",
+      component: () => import("../views/Allbooks.vue"),
+    },
   ],
 });
 
