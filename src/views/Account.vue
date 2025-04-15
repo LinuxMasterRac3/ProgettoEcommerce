@@ -317,7 +317,14 @@
                 :alt="favorite.product.name" />
               <div class="favorite-details">
                 <h3>{{ favorite.product.name }}</h3>
-                <p>€{{ favorite.product.price.toFixed(2) }}</p>
+                <p class="favorite-price">
+                  €{{ favorite.product.price.toFixed(2) }}
+                </p>
+                <p
+                  v-if="favorite.product.metadata?.author"
+                  class="favorite-author">
+                  di {{ favorite.product.metadata.author }}
+                </p>
               </div>
               <div class="favorite-actions">
                 <button
@@ -352,18 +359,27 @@
               :key="review.id"
               class="review-card">
               <div class="review-header">
-                <h3>{{ review.product.name }}</h3>
-                <div class="rating">
-                  <span
-                    v-for="i in 5"
-                    :key="i"
-                    class="star">
-                    {{ i <= review.rating ? "★" : "☆" }}
-                  </span>
+                <div class="review-product-info">
+                  <img
+                    :src="review.product.image_url"
+                    :alt="review.product.name"
+                    class="review-product-image" />
+                  <div>
+                    <h3>{{ review.product.name }}</h3>
+                    <div class="rating">
+                      <span
+                        v-for="i in 5"
+                        :key="i"
+                        class="star">
+                        {{ i <= review.rating ? "★" : "☆" }}
+                      </span>
+                    </div>
+                    <p>
+                      Data:
+                      {{ new Date(review.created_at).toLocaleDateString() }}
+                    </p>
+                  </div>
                 </div>
-                <p>
-                  Data: {{ new Date(review.created_at).toLocaleDateString() }}
-                </p>
               </div>
 
               <div class="review-content">
@@ -1150,22 +1166,62 @@ const toggleOrderDetails = (orderId) => {
 
 const fetchFavorites = async () => {
   if (!user.value?.id) return;
-  // Seleziona preferiti e relativi prodotti
+  // Seleziona preferiti e relativi prodotti con maggiori dettagli
   const { data, error } = await supabase
     .from("favorites")
     .select(
       `
       id,
       product_id,
-      product:products ( id, name, price, image_url )
+      created_at,
+      product:products ( 
+        id, 
+        name, 
+        price, 
+        description,
+        discount_percentage, 
+        rating,
+        review_count,
+        metadata,
+        created_at,
+        user_id
+      )
     `
     )
     .eq("user_id", user.value.id);
 
-  if (error) throw new Error(`Errore fetch preferiti: ${error.message}`);
+  if (error) {
+    console.error("Errore durante il recupero dei preferiti:", error);
+    throw new Error(`Errore fetch preferiti: ${error.message}`);
+  }
 
   // Filtra eventuali preferiti il cui prodotto associato non esiste più
-  favorites.value = (data || []).filter((fav) => fav.product);
+  // e formatta i dati per la visualizzazione
+  favorites.value = (data || [])
+    .filter((fav) => fav.product)
+    .map((fav) => {
+      // Estrai l'URL immagine dal metadata o usa un placeholder
+      let imageUrl = "https://placehold.co/300x400?text=No+Image";
+      if (
+        fav.product.metadata?.additional_images &&
+        fav.product.metadata.additional_images.length > 0
+      ) {
+        imageUrl = fav.product.metadata.additional_images[0];
+      }
+
+      return {
+        ...fav,
+        product: {
+          ...fav.product,
+          image_url: imageUrl, // Aggiungi l'URL dell'immagine
+          // Assicurati che il prezzo sia un numero per il .toFixed()
+          price:
+            typeof fav.product.price === "string"
+              ? parseFloat(fav.product.price)
+              : fav.product.price,
+        },
+      };
+    });
 };
 
 const removeFavorite = async (favoriteId) => {
@@ -1197,7 +1253,7 @@ const removeFavorite = async (favoriteId) => {
 const fetchReviews = async () => {
   if (!user.value?.id) return;
   try {
-    // Ottieni recensioni con i dati del prodotto associato
+    // Ottieni recensioni con dati completi del prodotto associato
     const { data, error } = await supabase
       .from("reviews")
       .select(
@@ -1207,16 +1263,53 @@ const fetchReviews = async () => {
         comment,
         created_at,
         product_id,
-        product:products ( id, name )
+        product:products ( 
+          id, 
+          name, 
+          price, 
+          description,
+          discount_percentage,
+          rating,
+          review_count,
+          metadata,
+          created_at
+        )
       `
       )
       .eq("user_id", user.value.id)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Errore durante il recupero delle recensioni:", error);
+      throw error;
+    }
 
-    // Filtra recensioni senza prodotto valido (se dovesse capitare)
-    reviews.value = (data || []).filter((rev) => rev.product);
+    // Filtra recensioni senza prodotto valido e formatta i dati
+    reviews.value = (data || [])
+      .filter((rev) => rev.product)
+      .map((rev) => {
+        // Estrai l'URL immagine dal metadata o usa un placeholder
+        let imageUrl = "https://placehold.co/300x400?text=No+Image";
+        if (
+          rev.product.metadata?.additional_images &&
+          rev.product.metadata.additional_images.length > 0
+        ) {
+          imageUrl = rev.product.metadata.additional_images[0];
+        }
+
+        return {
+          ...rev,
+          product: {
+            ...rev.product,
+            image_url: imageUrl, // Aggiungi l'URL dell'immagine
+            // Formatta il prezzo per visualizzazione
+            price:
+              typeof rev.product.price === "string"
+                ? parseFloat(rev.product.price)
+                : rev.product.price,
+          },
+        };
+      });
   } catch (error) {
     console.error("Errore fetch recensioni:", error);
     errorMessage.value = `Errore nel caricamento delle recensioni: ${error.message}`;
@@ -1684,6 +1777,19 @@ textarea {
   text-align: center;
 }
 
+.favorite-author {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
+}
+
+.favorite-price {
+  margin: 0.4rem 0;
+  font-weight: 600;
+  color: #4361ee;
+}
+
 /* Reviews styling */
 .reviews-list {
   display: grid;
@@ -1882,5 +1988,19 @@ textarea {
   .favorites-grid {
     grid-template-columns: repeat(4, 1fr); /* 4 colonne preferiti */
   }
+}
+
+.review-product-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.review-product-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #eee;
 }
 </style>

@@ -78,14 +78,21 @@ const product = ref<Book | null>(null);
 const seller = ref<User | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
+const selectedImageIndex = ref(0); // Track the currently selected image index
+
+// Funzione per cambiare l'immagine principale quando si clicca su una thumbnail
+const setMainImage = (index: number) => {
+  selectedImageIndex.value = index;
+};
 
 // Computed property per ottenere l'immagine principale
 const mainImage = computed(() => {
   if (
     product.value?.metadata?.additional_images &&
-    product.value.metadata.additional_images.length > 0
+    product.value.metadata.additional_images.length > 0 &&
+    selectedImageIndex.value < product.value.metadata.additional_images.length
   ) {
-    return product.value.metadata.additional_images[0];
+    return product.value.metadata.additional_images[selectedImageIndex.value];
   }
   return "https://placehold.co/300x400?text=No+Image";
 });
@@ -94,9 +101,9 @@ const mainImage = computed(() => {
 const additionalImages = computed(() => {
   if (
     product.value?.metadata?.additional_images &&
-    product.value.metadata.additional_images.length > 1
+    product.value.metadata.additional_images.length > 0
   ) {
-    return product.value.metadata.additional_images.slice(1);
+    return product.value.metadata.additional_images;
   }
   return [];
 });
@@ -130,6 +137,7 @@ const fetchProductDetails = async () => {
       };
 
       if (productData.user_id) {
+        // Recupera informazioni complete del venditore, inclusa l'immagine di profilo
         const { data: userData, error: userError } = await supabase
           .from("profiles")
           .select("*")
@@ -141,8 +149,12 @@ const fetchProductDetails = async () => {
             id: userData.id,
             username: userData.username,
             email: userData.email,
-            full_name: userData.full_name,
-            avatar_url: userData.avatar_url,
+            full_name:
+              userData.full_name ||
+              (userData.first_name && userData.last_name
+                ? `${userData.first_name} ${userData.last_name}`
+                : "Utente Supabase"),
+            avatar_url: userData.avatar_url || userData.profile_image,
             location: userData.location,
             phone: userData.phone,
             rating: userData.rating,
@@ -203,12 +215,15 @@ onMounted(() => {
           <div class="product-images">
             <div class="product-thumbnails">
               <img
-                v-for="(image, index) in product.metadata?.additional_images ||
-                []"
+                v-for="(image, index) in additionalImages"
                 :key="index"
                 :src="image"
-                alt="Thumbnail"
-                class="product-thumbnail" />
+                :class="[
+                  'product-thumbnail',
+                  { active: selectedImageIndex === index },
+                ]"
+                @click="setMainImage(index)"
+                alt="Thumbnail" />
             </div>
             <img
               :src="mainImage"
@@ -240,9 +255,62 @@ onMounted(() => {
                 placeholder="Inserisci il tuo CAP"
                 class="cap-input" />
             </div>
-            <p class="seller-info">
-              Venditore:
-              <strong>{{ seller?.full_name || "Sconosciuto" }}</strong>
+
+            <!-- Migliorata visualizzazione info venditore -->
+            <div
+              class="seller-info-card"
+              v-if="seller">
+              <div class="seller-header">Venditore</div>
+              <div class="seller-details">
+                <div class="seller-avatar">
+                  <img
+                    v-if="seller.avatar_url"
+                    :src="seller.avatar_url"
+                    alt="Immagine profilo" />
+                  <div
+                    v-else
+                    class="avatar-placeholder">
+                    {{
+                      seller.full_name
+                        ? seller.full_name.charAt(0).toUpperCase()
+                        : "U"
+                    }}
+                  </div>
+                </div>
+                <div class="seller-text">
+                  <p class="seller-name">
+                    {{
+                      seller.full_name || seller.username || "Utente Supabase"
+                    }}
+                  </p>
+                  <p
+                    class="seller-location"
+                    v-if="seller.location">
+                    {{ seller.location }}
+                  </p>
+                  <p
+                    class="seller-member-since"
+                    v-if="seller.memberSince">
+                    Membro dal
+                    {{ new Date(seller.memberSince).toLocaleDateString() }}
+                  </p>
+                  <div
+                    class="seller-rating"
+                    v-if="seller.rating">
+                    <span
+                      v-for="i in 5"
+                      :key="i"
+                      class="star">
+                      {{ i <= seller.rating ? "★" : "☆" }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p
+              class="seller-info"
+              v-else>
+              Venditore: <strong>Sconosciuto</strong>
             </p>
           </div>
         </div>
@@ -259,32 +327,26 @@ onMounted(() => {
           v-if="product.metadata">
           <h2>Informazioni aggiuntive</h2>
           <ul>
-            <li><strong>Note:</strong> {{ product.metadata.notes }}</li>
-            <li><strong>Categoria:</strong> {{ product.metadata.category }}</li>
-            <li>
+            <li v-if="product.metadata.notes">
+              <strong>Note:</strong> {{ product.metadata.notes }}
+            </li>
+            <li v-if="product.metadata.category">
+              <strong>Categoria:</strong> {{ product.metadata.category }}
+            </li>
+            <li v-if="product.metadata.condition">
               <strong>Condizione:</strong> {{ product.metadata.condition }}
             </li>
-            <li>
+            <li v-if="product.metadata.publisher">
               <strong>Casa Editrice:</strong> {{ product.metadata.publisher }}
             </li>
-            <li><strong>Posizione:</strong> {{ product.metadata.location }}</li>
-            <li>
+            <li v-if="product.metadata.location">
+              <strong>Posizione:</strong> {{ product.metadata.location }}
+            </li>
+            <li v-if="product.metadata.shipping_available !== undefined">
               <strong>Spedizione Disponibile:</strong>
               {{ product.metadata.shipping_available ? "Sì" : "No" }}
             </li>
           </ul>
-          <div
-            class="additional-images"
-            v-if="additionalImages.length">
-            <h3>Immagini aggiuntive</h3>
-            <div
-              v-for="(url, index) in additionalImages"
-              :key="index">
-              <img
-                :src="url"
-                alt="Immagine aggiuntiva" />
-            </div>
-          </div>
         </div>
 
         <!-- Related products -->
@@ -352,20 +414,21 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   height: 400px;
-  justify-content: space-between;
+  justify-content: flex-start;
+  overflow-y: auto;
 }
 
 .product-main-image {
   width: 400px;
   height: 400px;
   border-radius: 10px;
-  object-fit: contain; /* Cambiato da cover a contain per evitare il taglio */
+  object-fit: contain;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .product-thumbnail {
   width: 60px;
-  height: calc(400px / 4 - 10px);
+  height: 60px;
   border-radius: 5px;
   object-fit: cover;
   cursor: pointer;
@@ -375,6 +438,12 @@ onMounted(() => {
 
 .product-thumbnail:hover {
   border-color: #6a5acd;
+}
+
+.product-thumbnail.active {
+  border-color: #6a5acd;
+  border-width: 2px;
+  box-shadow: 0 0 6px rgba(106, 90, 205, 0.5);
 }
 
 .product-info {
@@ -404,6 +473,7 @@ onMounted(() => {
 .product-buttons {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .contact-button {
@@ -463,6 +533,92 @@ onMounted(() => {
   width: 100%;
 }
 
+/* Nuovo stile per la card del venditore */
+.seller-info-card {
+  margin-top: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.seller-header {
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  font-weight: 600;
+  color: #444;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.seller-details {
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.seller-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #e0e0e0;
+  border: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.seller-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #666;
+  background-color: #e9e9e9;
+}
+
+.seller-text {
+  flex: 1;
+}
+
+.seller-name {
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 5px 0;
+  font-size: 16px;
+}
+
+.seller-location {
+  color: #666;
+  margin: 0 0 5px 0;
+  font-size: 14px;
+}
+
+.seller-member-since {
+  color: #888;
+  margin: 0 0 5px 0;
+  font-size: 12px;
+}
+
+.seller-rating {
+  display: flex;
+  gap: 2px;
+}
+
+.star {
+  color: #ffb74d;
+  font-size: 16px;
+}
+
 .seller-info {
   margin-top: 10px;
   font-size: 16px;
@@ -500,15 +656,19 @@ onMounted(() => {
 .related-products-list {
   display: flex;
   gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 10px;
 }
 
 .related-product-card {
   width: 150px;
+  flex-shrink: 0;
   text-align: center;
 }
 
 .related-product-image {
   width: 100%;
+  height: 150px;
   border-radius: 10px;
   object-fit: cover;
   margin-bottom: 10px;
@@ -526,6 +686,7 @@ onMounted(() => {
   font-size: 14px;
   color: #666;
 }
+
 .add-to-cart-button {
   padding: 12px 24px;
   background-color: #28a745;
@@ -539,5 +700,34 @@ onMounted(() => {
 
 .add-to-cart-button:hover {
   background-color: #218838;
+}
+
+/* Responsive fixes */
+@media (max-width: 768px) {
+  .product-main {
+    flex-direction: column;
+  }
+
+  .product-images {
+    flex-direction: column;
+  }
+
+  .product-thumbnails {
+    flex-direction: row;
+    height: auto;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .product-main-image {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+  }
+
+  .product-buttons {
+    flex-direction: column;
+  }
 }
 </style>

@@ -1,4 +1,6 @@
 <!-- filepath: c:\Users\HP1342\Desktop\Progetto_e-commerce\ProgettoEcommerce\src\views\Cart.vue -->
+<!-- modifiche dalle righe 55-73 118-139 165-196 198-227 603-613 -->
+
 <template>
   <div class="page-wrapper">
     <!-- Navbar -->
@@ -58,11 +60,19 @@
               v-for="(item, index) in cartItems"
               :key="item.id">
               <div class="item-product">
-                <img
-                  :src="item.image"
-                  :alt="item.name"
-                  class="item-image" />
-                <span class="item-name">{{ item.name }}</span>
+                <!-- Aggiunto RouterLink per l'immagine -->
+                <RouterLink :to="`/product/${item.id}`">
+                  <img
+                    :src="getMainImage(item)"
+                    :alt="item.name"
+                    class="item-image" />
+                </RouterLink>
+                <!-- Aggiunto RouterLink per il nome -->
+                <RouterLink
+                  :to="`/product/${item.id}`"
+                  class="item-name-link">
+                  <span class="item-name">{{ item.name }}</span>
+                </RouterLink>
               </div>
               <div class="item-price">€{{ item.price.toFixed(2) }}</div>
               <div class="item-subtotal">
@@ -129,17 +139,14 @@
                 <span>- €{{ (cartTotal - discountedTotal).toFixed(2) }}</span>
               </p>
               <p>
-                <span>Spedizione</span> <span>{{ shippingDisplay }}</span>
+                <span>Spedizione</span>
+                <span>€{{ shippingCost.toFixed(2) }}</span>
               </p>
               <hr class="summary-divider" />
               <p class="summary-total">
                 <strong>
                   <span>Totale</span>
-                  <span
-                    >€{{
-                      totalWithShipping ? totalWithShipping.toFixed(2) : "0.00"
-                    }}</span
-                  >
+                  <span>€{{ totalWithShipping.toFixed(2) }}</span>
                 </strong>
               </p>
             </div>
@@ -180,7 +187,6 @@ const fetchCartItems = async () => {
 
   try {
     const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    console.log("Saved cart:", savedCart); // Log per verificare gli ID salvati
 
     if (savedCart.length === 0) {
       cartItems.value = [];
@@ -194,17 +200,14 @@ const fetchCartItems = async () => {
 
     if (fetchError) throw fetchError;
 
-    console.log("Fetched data:", data); // Log per verificare i dati recuperati
-
     cartItems.value = data.map((item) => ({
       id: item.id,
       name: item.name,
       price: item.price,
       quantity: 1,
-      image: item.image_url,
+      metadata: item.metadata || {}, // Include il campo metadata
     }));
   } catch (err) {
-    console.error("Errore durante il recupero dei dati del carrello:", err);
     error.value =
       "Impossibile caricare i dati del carrello. Riprova più tardi.";
   } finally {
@@ -212,12 +215,43 @@ const fetchCartItems = async () => {
   }
 };
 
+// Computed property per calcolare il costo di spedizione
+const shippingCost = computed(() => {
+  const totalBooks = cartItems.value.reduce(
+    (total, item) => total + item.quantity,
+    0
+  );
+  return totalBooks * 1.99; // €1,99 per ogni libro
+});
+
+// Computed property per calcolare il totale con la spedizione
+const totalWithShipping = computed(() => cartTotal.value + shippingCost.value);
+
+// Computed property per ottenere l'immagine principale
+const getMainImage = (item: any) => {
+  if (
+    item.metadata?.additional_images &&
+    item.metadata.additional_images.length > 0
+  ) {
+    return item.metadata.additional_images[0];
+  }
+  return "https://placehold.co/300x400?text=No+Image";
+};
+
+// Computed property per ottenere le immagini aggiuntive
+const getAdditionalImages = (item: any) => {
+  if (
+    item.metadata?.additional_images &&
+    item.metadata.additional_images.length > 1
+  ) {
+    return item.metadata.additional_images.slice(1);
+  }
+  return [];
+};
+
 const cartTotal = computed(() =>
   cartItems.value.reduce((total, item) => total + item.price * item.quantity, 0)
 );
-
-const shippingCost = ref(5); // Costo di spedizione predefinito
-const totalWithShipping = computed(() => cartTotal.value + shippingCost.value);
 
 // Rimuovi un libro dal carrello
 const removeItem = (index: number) => {
@@ -587,6 +621,17 @@ const checkout = () => {
   font-size: 1.2em;
   color: #666;
   margin-bottom: 25px;
+}
+
+.item-name-link {
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+
+.item-name-link:hover {
+  color: #6a5acd; /* Colore viola su hover */
 }
 
 /* Responsive */
