@@ -461,7 +461,7 @@ onMounted(() => {
 
 .product-author {
   font-size: 16px;
-  color: #666;
+  color: #000000;
 }
 
 .product-price {
@@ -488,7 +488,7 @@ onMounted(() => {
 }
 
 .contact-button:hover {
-  background-color: #333;
+  background-color: #000000;
 }
 
 .buy-button {
@@ -523,7 +523,7 @@ onMounted(() => {
 
 .shipping-info p {
   font-size: 16px;
-  color: #333;
+  color: #000;
 }
 
 .cap-input {
@@ -582,7 +582,7 @@ onMounted(() => {
   justify-content: center;
   font-size: 20px;
   font-weight: bold;
-  color: #666;
+  color: #000;
   background-color: #e9e9e9;
 }
 
@@ -598,13 +598,13 @@ onMounted(() => {
 }
 
 .seller-location {
-  color: #666;
+  color: #000;
   margin: 0 0 5px 0;
   font-size: 14px;
 }
 
 .seller-member-since {
-  color: #888;
+  color: #000;
   margin: 0 0 5px 0;
   font-size: 12px;
 }
@@ -622,7 +622,7 @@ onMounted(() => {
 .seller-info {
   margin-top: 10px;
   font-size: 16px;
-  color: #555;
+  color: #000;
 }
 
 /* Product description */
@@ -638,7 +638,7 @@ onMounted(() => {
 
 .product-description-section p {
   font-size: 16px;
-  color: #555;
+  color: #000;
   line-height: 1.6;
 }
 
@@ -679,12 +679,12 @@ onMounted(() => {
   font-size: 14px;
   font-weight: bold;
   margin-bottom: 5px;
-  color: #333;
+  color: #000;
 }
 
 .related-product-price {
   font-size: 14px;
-  color: #666;
+  color: #000;
 }
 
 .add-to-cart-button {
