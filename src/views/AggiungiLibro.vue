@@ -1,60 +1,59 @@
 <template>
-  <div class="add-book-container">
-    <header>
-      <Navbar />
-    </header>
+  <div class="add-book-page">
+    <Navbar />
 
-    <div class="page-title">
-      <h2>Aggiungi Libro</h2>
-      <p>Inserisci i dettagli del libro che vuoi vendere</p>
-    </div>
+    <div class="page-content">
+      <h2 class="page-title">Aggiungi Libro</h2>
+      <p class="page-subtitle">
+        Inserisci i dettagli del libro che vuoi vendere
+      </p>
 
-    <!-- Authentication Message -->
-    <div
-      v-if="!isAuthenticated && !isLoading"
-      class="auth-required">
-      <div class="auth-message">
-        <h3>Accesso Richiesto</h3>
-        <p>Per aggiungere un libro è necessario accedere al tuo account.</p>
-        <div class="auth-buttons">
-          <RouterLink
-            to="/login"
-            class="login-button"
-            >Accedi</RouterLink
-          >
-          <RouterLink
-            to="/register"
-            class="register-button"
-            >Registrati</RouterLink
-          >
+      <!-- Authentication Message -->
+      <div
+        v-if="!isAuthenticated && !isLoading"
+        class="auth-required">
+        <div class="auth-message">
+          <h3>Accesso Richiesto</h3>
+          <p>Per aggiungere un libro è necessario accedere al tuo account.</p>
+          <div class="auth-buttons">
+            <RouterLink
+              to="/login"
+              class="login-button"
+              >Accedi</RouterLink
+            >
+            <RouterLink
+              to="/register"
+              class="register-button"
+              >Registrati</RouterLink
+            >
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Loading State -->
-    <div
-      v-else-if="isLoading"
-      class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>Caricamento...</p>
-    </div>
-
-    <!-- Authenticated Content -->
-    <div v-else>
+      <!-- Loading State -->
       <div
-        v-if="successMessage"
-        class="success-message">
-        {{ successMessage }}
+        v-else-if="isLoading"
+        class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Caricamento...</p>
       </div>
 
-      <div
-        v-if="errorMessage"
-        class="error-message">
-        <div v-html="errorMessage"></div>
-      </div>
+      <!-- Authenticated Content -->
+      <div v-else>
+        <div
+          v-if="successMessage"
+          class="success-message">
+          {{ successMessage }}
+        </div>
+        <div
+          v-if="errorMessage"
+          class="error-message">
+          <div v-html="errorMessage"></div>
+        </div>
 
-      <div class="form-container">
-        <form @submit.prevent="submitBook">
+        <form
+          @submit.prevent="submitBook"
+          class="book-form">
           <div class="form-section">
             <h3>Informazioni Generali</h3>
 
@@ -241,12 +240,60 @@
 
             <div class="form-group">
               <label for="location">Posizione*</label>
-              <input
-                type="text"
-                id="location"
-                v-model="bookData.location"
-                required
-                placeholder="Città/Zona dove il libro è disponibile" />
+              <div class="location-input-container">
+                <input
+                  type="text"
+                  id="location"
+                  v-model="locationInput"
+                  @input="handleLocationInput"
+                  @focus="showSuggestions = true"
+                  @blur="handleLocationBlur"
+                  @keydown.down.prevent="navigateSuggestions('down')"
+                  @keydown.up.prevent="navigateSuggestions('up')"
+                  @keydown.enter.prevent="
+                    selectSuggestion(selectedSuggestionIndex)
+                  "
+                  @keydown.esc="showSuggestions = false"
+                  required
+                  autocomplete="off"
+                  placeholder="Inizia a digitare il nome del comune..." />
+
+                <div
+                  v-if="showSuggestions && filteredComuni.length > 0"
+                  class="comuni-suggestions">
+                  <div
+                    v-for="(comune, index) in filteredComuni"
+                    :key="comune.codice"
+                    @mousedown="selectSuggestion(index)"
+                    :class="[
+                      'comune-suggestion',
+                      { selected: index === selectedSuggestionIndex },
+                    ]">
+                    <span class="comune-name">{{ comune.nome }}</span>
+                    <span
+                      class="provincia-sigla"
+                      v-if="comune.provincia && comune.provincia.sigla">
+                      ({{ comune.provincia.sigla }})
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  v-if="
+                    showSuggestions &&
+                    locationInput &&
+                    filteredComuni.length === 0
+                  "
+                  class="no-suggestions">
+                  Nessun comune trovato
+                </div>
+              </div>
+              <small
+                class="location-help-text"
+                v-if="comuniError">
+                Errore nel caricamento dei comuni. Puoi inserire manualmente la
+                tua città.
+              </small>
             </div>
 
             <div class="form-group">
@@ -326,22 +373,6 @@
           </div>
         </form>
       </div>
-
-      <!-- Simplified storage status indicator -->
-      <div
-        class="debug-container"
-        v-if="isAuthenticated">
-        <div class="endpoint-info">
-          <small><strong>Bucket di storage:</strong> images</small>
-        </div>
-        <button
-          type="button"
-          class="debug-button"
-          @click="verifyStorageAccess"
-          title="Verifica la connessione ai bucket di storage">
-          <i class="fas fa-database"></i> Verifica connessione
-        </button>
-      </div>
     </div>
     <Footer />
   </div>
@@ -385,6 +416,162 @@ const bookData = reactive({
   notes: "",
   shippingAvailable: false,
 });
+
+// Comuni italiani
+const comuni = ref([]);
+const locationInput = ref("");
+const filteredComuni = ref([]);
+const showSuggestions = ref(false);
+const selectedSuggestionIndex = ref(-1);
+const isLoadingComuni = ref(false);
+const comuniError = ref(null);
+
+// Carica i comuni italiani
+const fetchComuni = async () => {
+  if (comuni.value.length > 0) return;
+
+  try {
+    isLoadingComuni.value = true;
+    comuniError.value = null;
+
+    // Utilizziamo una cache locale per evitare troppe chiamate all'API
+    const cachedComuni = localStorage.getItem("comuni-cache");
+    const cacheTimestamp = localStorage.getItem("comuni-cache-timestamp");
+    const cacheIsValid =
+      cacheTimestamp && Date.now() - parseInt(cacheTimestamp) < 86400000; // 24 ore
+
+    if (cachedComuni && cacheIsValid) {
+      comuni.value = JSON.parse(cachedComuni);
+      console.log(
+        `Caricati ${comuni.value.length} comuni italiani dalla cache`
+      );
+      return;
+    }
+
+    const response = await fetch(
+      "https://raw.githubusercontent.com/matteocontrini/comuni-json/master/comuni.json"
+    );
+    if (!response.ok) {
+      throw new Error(`Errore nel caricamento dei comuni: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Verifica e normalizza i dati per assicurarsi che abbiano la struttura corretta
+    const normalizedData = data.map((comune) => {
+      // Se il comune ha province non definite correttamente, assegna valori di default
+      if (!comune.provincia || !comune.provincia.sigla) {
+        console.warn(`Comune senza provincia: ${comune.nome}`);
+        comune.provincia = comune.provincia || {};
+        comune.provincia.nome = comune.provincia.nome || "Sconosciuta";
+        comune.provincia.sigla = comune.provincia.sigla || "??";
+      }
+      return comune;
+    });
+
+    comuni.value = normalizedData;
+
+    // Salva i dati in cache
+    try {
+      localStorage.setItem("comuni-cache", JSON.stringify(normalizedData));
+      localStorage.setItem("comuni-cache-timestamp", Date.now().toString());
+    } catch (e) {
+      console.warn("Impossibile salvare i comuni in cache:", e);
+    }
+
+    console.log(`Caricati ${comuni.value.length} comuni italiani`);
+  } catch (error) {
+    console.error("Errore durante il caricamento dei comuni:", error);
+    comuniError.value = error.message;
+  } finally {
+    isLoadingComuni.value = false;
+  }
+};
+
+// Filtra i comuni in base all'input
+const handleLocationInput = () => {
+  if (locationInput.value.length < 2) {
+    filteredComuni.value = [];
+    return;
+  }
+
+  const input = locationInput.value.toLowerCase().trim();
+
+  filteredComuni.value = comuni.value
+    .filter((comune) => {
+      // Cerca sia nel nome del comune che nella provincia
+      const matchesName = comune.nome.toLowerCase().includes(input);
+      const matchesProvincia =
+        comune.provincia &&
+        (comune.provincia.nome.toLowerCase().includes(input) ||
+          comune.provincia.sigla.toLowerCase() === input);
+
+      // Dai priorità ai comuni che iniziano con la stringa di ricerca
+      return matchesName || matchesProvincia;
+    })
+    .sort((a, b) => {
+      // Ordina mettendo prima i risultati che iniziano con la stringa di ricerca
+      const aStartsWithQuery = a.nome.toLowerCase().startsWith(input);
+      const bStartsWithQuery = b.nome.toLowerCase().startsWith(input);
+
+      if (aStartsWithQuery && !bStartsWithQuery) return -1;
+      if (!aStartsWithQuery && bStartsWithQuery) return 1;
+
+      // Se entrambi iniziano o non iniziano con la query, ordina alfabeticamente
+      return a.nome.localeCompare(b.nome);
+    })
+    .slice(0, 15); // Aumentiamo il limite a 15 risultati per includere più opzioni
+
+  selectedSuggestionIndex.value = -1;
+  showSuggestions.value = true;
+};
+
+// Gestisce la selezione di un comune dai suggerimenti
+const selectSuggestion = (index) => {
+  if (index >= 0 && index < filteredComuni.value.length) {
+    const selectedComune = filteredComuni.value[index];
+
+    // Verifica che l'oggetto provincia esista e abbia la proprietà sigla
+    if (selectedComune.provincia && selectedComune.provincia.sigla) {
+      locationInput.value = `${selectedComune.nome} (${selectedComune.provincia.sigla})`;
+    } else {
+      // Fallback nel caso in cui la struttura dei dati non sia come previsto
+      locationInput.value = selectedComune.nome;
+      console.warn("Dati provincia mancanti per il comune:", selectedComune);
+    }
+
+    bookData.location = locationInput.value;
+    showSuggestions.value = false;
+  }
+};
+
+// Gestisce la navigazione con le frecce su/giù
+const navigateSuggestions = (direction) => {
+  if (filteredComuni.value.length === 0) return;
+
+  if (direction === "down") {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value < filteredComuni.value.length - 1
+        ? selectedSuggestionIndex.value + 1
+        : 0;
+  } else {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value > 0
+        ? selectedSuggestionIndex.value - 1
+        : filteredComuni.value.length - 1;
+  }
+};
+
+// Gestisce il blur del campo input
+const handleLocationBlur = () => {
+  // Ritarda la chiusura per permettere il click sui suggerimenti
+  setTimeout(() => {
+    showSuggestions.value = false;
+  }, 200);
+
+  // Aggiorna bookData.location con l'input corrente
+  bookData.location = locationInput.value;
+};
 
 // State for photos
 const fileInput = ref(null);
@@ -472,7 +659,7 @@ const submitBook = async () => {
       return;
     }
 
-    // Carica le immagini direttamente senza verifiche sui bucket
+    // Carica le immagini direttamente
     let imageUrls;
     try {
       imageUrls = await uploadImages(photoFiles.value);
@@ -491,9 +678,6 @@ const submitBook = async () => {
       return;
     }
 
-    // Salviamo tutte le immagini nei metadata in un array 'additional_images'
-    console.log("URLs immagini caricate:", imageUrls);
-
     // Prepara i dati del libro
     const bookDetails = {
       author: bookData.author,
@@ -506,7 +690,7 @@ const submitBook = async () => {
       notes: bookData.notes || null,
       shipping_available: bookData.shippingAvailable,
       location: bookData.location,
-      additional_images: imageUrls, // Modifica: usa additional_images anziché images
+      additional_images: imageUrls,
     };
 
     const bookToInsert = {
@@ -517,8 +701,6 @@ const submitBook = async () => {
       metadata: bookDetails,
       status: "active",
     };
-
-    console.log("Inserimento libro con dati:", bookToInsert);
 
     try {
       const { data, error } = await supabase
@@ -545,33 +727,6 @@ const submitBook = async () => {
       "Si è verificato un errore: " + (error.message || "Riprova più tardi");
   } finally {
     isSubmitting.value = false;
-  }
-};
-
-// Metodo di verifica semplificato
-const verifyStorageAccess = async () => {
-  errorMessage.value = "";
-  successMessage.value = "";
-
-  try {
-    const { data, error } = await supabase.storage
-      .from(storageBucket)
-      .list("", { limit: 1 });
-
-    if (error) {
-      console.error("❌ Errore accesso storage:", error);
-      errorMessage.value = `Errore nell'accesso al bucket "${storageBucket}": ${error.message}`;
-      return false;
-    }
-
-    console.log("✅ Accesso al bucket verificato");
-    successMessage.value = `Connessione al bucket "${storageBucket}" verificata con successo.`;
-    return true;
-  } catch (error) {
-    console.error("❌ Errore verifica storage:", error);
-    errorMessage.value =
-      "Errore nella verifica dello storage: " + error.message;
-    return false;
   }
 };
 
@@ -653,6 +808,7 @@ const resetForm = () => {
     }
   });
 
+  locationInput.value = ""; // Resetta anche l'input di ricerca comuni
   photoFiles.value = [];
   photoPreview.value = [];
   errors.photos = "";
@@ -683,11 +839,12 @@ onMounted(async () => {
 
     if (session) {
       user.value = session.user;
-      // Verifica l'accesso allo storage ma non blocca il componente
-      await verifyStorageAccess();
     } else {
       console.log("Utente non autenticato");
     }
+
+    // Carica i comuni italiani
+    await fetchComuni();
   } catch (error) {
     console.error("Error during initialization:", error);
     errorMessage.value = "Si è verificato un errore: " + error.message;
@@ -698,52 +855,36 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.add-book-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-header {
+.add-book-page {
+  width: 100%;
+  min-height: 100vh;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  margin-bottom: 30px;
+  flex-direction: column;
 }
 
-nav {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-}
-
-.nav-link {
-  text-decoration: none;
-  color: #6a5acd;
-  font-weight: 500;
-}
-
-.icon {
-  font-size: 20px;
-  cursor: pointer;
+.page-content {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 20px 40px;
+  box-sizing: border-box;
 }
 
 .page-title {
-  margin-bottom: 30px;
+  font-size: 28px;
+  margin: 20px 0 5px;
   text-align: center;
 }
 
-.page-title h2 {
-  font-size: 28px;
-  margin-bottom: 10px;
-}
-
-.page-title p {
+.page-subtitle {
   color: #666;
+  text-align: center;
+  margin-bottom: 30px;
 }
 
-.form-container {
+.book-form {
+  max-width: 1200px;
+  margin: 0 auto;
   background-color: white;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -946,7 +1087,6 @@ textarea:focus {
   margin-top: 5px;
 }
 
-/* New styles for authentication prompt */
 .auth-required {
   display: flex;
   justify-content: center;
@@ -1033,54 +1173,13 @@ textarea:focus {
   }
 }
 
-.storage-info {
-  margin-top: 10px;
-  font-size: 0.9rem;
-  padding: 8px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-
-.storage-info a {
-  color: #ff6b6b;
-  text-decoration: underline;
-}
-
-.debug-container {
-  margin: 10px 0;
-  text-align: right;
-}
-
-.endpoint-info {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 8px;
-  text-align: right;
-}
-
-.endpoint-info small {
-  display: block;
-  line-height: 1.4;
-}
-
-.debug-button {
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #555;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.debug-button:hover {
-  background-color: #e5e5e5;
-}
-
 @media (max-width: 768px) {
-  .form-container {
-    padding: 20px;
+  .page-content {
+    padding: 0 10px 20px;
+  }
+
+  .book-form {
+    padding: 15px;
   }
 
   .photo-upload-container {
@@ -1097,21 +1196,21 @@ textarea:focus {
   }
 }
 
-/* Styles to ensure all text is black for better visibility */
-.add-book-container,
-.add-book-container input,
-.add-book-container textarea,
-.add-book-container select,
-.add-book-container button,
-.add-book-container label,
-.add-book-container p,
-.add-book-container h2,
-.add-book-container h3,
-.add-book-container option {
+/* Assicura che tutti i testi siano ben visibili */
+.add-book-page,
+.add-book-page input,
+.add-book-page textarea,
+.add-book-page select,
+.add-book-page button,
+.add-book-page label,
+.add-book-page p,
+.add-book-page h2,
+.add-book-page h3,
+.add-book-page option {
   color: #000000;
 }
 
-.add-book-container select option {
+.add-book-page select option {
   color: #000000;
   background-color: #ffffff;
 }
@@ -1119,5 +1218,56 @@ textarea:focus {
 .submit-button,
 .login-button {
   color: white !important;
+}
+
+.location-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.comuni-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.comune-suggestion {
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+}
+
+.comune-suggestion:hover {
+  background-color: #f5f5f5;
+}
+
+.comune-suggestion.selected {
+  background-color: #e8e8fd;
+}
+
+.comune-name {
+  font-weight: 500;
+}
+
+.provincia-sigla {
+  color: #666;
+  font-size: 0.9em;
+}
+
+.location-help-text {
+  color: #666;
+  font-size: 12px;
+  margin-top: 5px;
 }
 </style>
