@@ -183,7 +183,7 @@
 import { ref, computed, onMounted } from "vue";
 import { createClient } from "@supabase/supabase-js";
 import { RouterLink } from "vue-router";
-import Navbar from "../components/navbar.vue"; // Importa il Navbar
+import Navbar from "../components/Navbar.vue"; // Importing with correct capitalization
 import Footer from "../components/footer.vue"; // Importa il Footer
 
 // Define interface for cart item type
