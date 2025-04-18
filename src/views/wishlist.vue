@@ -1,75 +1,77 @@
 <template>
-  <div>
+  <div class="page-wrapper">
     <!-- Navbar -->
     <Navbar />
 
     <!-- Main Content -->
-    <div class="wishlist-container">
-      <h1 class="wishlist-title">Lista dei Desideri</h1>
+    <div class="main-content">
+      <div class="wishlist-container">
+        <h1 class="wishlist-title">Lista dei Desideri</h1>
 
-      <!-- Loading State -->
-      <div
-        v-if="isLoading"
-        class="loading">
-        Caricamento in corso...
-      </div>
-
-      <!-- Error State -->
-      <div
-        v-else-if="error"
-        class="error">
-        {{ error }}
-      </div>
-
-      <!-- Wishlist Items -->
-      <div v-else>
+        <!-- Loading State -->
         <div
-          v-if="wishlistItems.length === 0"
-          class="empty-wishlist">
-          <p>La tua lista dei desideri è vuota.</p>
-          <RouterLink
-            to="/shop"
-            class="continue-shopping-btn">
-            Torna allo Shop
-          </RouterLink>
+          v-if="isLoading"
+          class="loading">
+          Caricamento in corso...
         </div>
 
+        <!-- Error State -->
         <div
-          v-else
-          class="wishlist-grid">
+          v-else-if="error"
+          class="error">
+          {{ error }}
+        </div>
+
+        <!-- Wishlist Items -->
+        <div v-else>
           <div
-            v-for="item in wishlistItems"
-            :key="item.id"
-            class="wishlist-card">
+            v-if="wishlistItems.length === 0"
+            class="empty-wishlist">
+            <p>La tua lista dei desideri è vuota.</p>
             <RouterLink
-              :to="`/product/${item.id}`"
-              class="wishlist-image-link">
-              <img
-                :src="getMainImage(item)"
-                :alt="item.title"
-                class="wishlist-image"
-                @error="handleImageError($event)" />
+              to="/shop"
+              class="continue-shopping-btn">
+              Torna allo Shop
             </RouterLink>
-            <div class="wishlist-details">
+          </div>
+
+          <div
+            v-else
+            class="wishlist-grid">
+            <div
+              v-for="item in wishlistItems"
+              :key="item.id"
+              class="wishlist-card">
               <RouterLink
                 :to="`/product/${item.id}`"
-                class="wishlist-title-link">
-                <h2 class="wishlist-item-title">{{ item.title }}</h2>
+                class="wishlist-image-link">
+                <img
+                  :src="getMainImage(item)"
+                  :alt="item.title"
+                  class="wishlist-image"
+                  @error="handleImageError($event)" />
               </RouterLink>
-              <p class="wishlist-item-author">
-                Autore: {{ item.metadata.author || "Sconosciuto" }}
-              </p>
-              <p class="wishlist-item-category">
-                Categoria: {{ item.metadata.category || "Non specificata" }}
-              </p>
-              <p class="wishlist-item-price">
-                Prezzo: €{{ item.price.toFixed(2) }}
-              </p>
-              <button
-                @click="removeFromWishlist(item.id)"
-                class="wishlist-remove-btn">
-                Rimuovi
-              </button>
+              <div class="wishlist-details">
+                <RouterLink
+                  :to="`/product/${item.id}`"
+                  class="wishlist-title-link">
+                  <h2 class="wishlist-item-title">{{ item.title }}</h2>
+                </RouterLink>
+                <p class="wishlist-item-author">
+                  Autore: {{ item.metadata.author || "Sconosciuto" }}
+                </p>
+                <p class="wishlist-item-category">
+                  Categoria: {{ item.metadata.category || "Non specificata" }}
+                </p>
+                <p class="wishlist-item-price">
+                  Prezzo: €{{ item.price.toFixed(2) }}
+                </p>
+                <button
+                  @click="removeFromWishlist(item.id)"
+                  class="wishlist-remove-btn">
+                  Rimuovi
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -89,6 +91,15 @@ import Navbar from "@/components/Navbar.vue";
 import Footer from "@/components/footer.vue";
 import { RouterLink } from "vue-router";
 
+// Define interface for wishlist item type
+interface WishlistItem {
+  id: string;
+  title: string;
+  price: number;
+  metadata: any;
+  image: string;
+}
+
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
 const supabaseKey =
@@ -96,7 +107,7 @@ const supabaseKey =
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // State variables
-const wishlistItems = ref([]); // Array per memorizzare i libri nella wishlist
+const wishlistItems = ref<WishlistItem[]>([]); // Typed array for wishlist items
 const isLoading = ref(true); // Stato di caricamento
 const error = ref<string | null>(null); // Messaggio di errore
 const wishlist = ref<string[]>([]); // Array per memorizzare gli ID dei libri nella wishlist
@@ -104,12 +115,12 @@ const userId = ref<string | null>(null); // ID dell'utente autenticato
 
 // Recupera l'ID dell'utente autenticato
 const fetchUserId = async () => {
-  const { data: user, error } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getUser();
   if (error) {
     console.error("Errore durante il recupero dell'utente:", error);
     return;
   }
-  userId.value = user?.id || null;
+  userId.value = data?.user?.id || null;
 };
 
 // Recupera i libri dalla wishlist
@@ -235,122 +246,188 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #ffffff, #f8f7ff);
+}
+
+/* Add this new class */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .wishlist-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 40px auto;
   padding: 20px;
-  text-align: center;
-  font-family: "Roboto", Arial, sans-serif;
+  flex: 1;
 }
 
 .wishlist-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #000; /* Testo nero */
-  margin-bottom: 20px;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2d2d2d;
+  margin-bottom: 40px;
+  text-align: center;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .wishlist-grid {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(220px, 1fr)
-  ); /* Riquadro più piccolo */
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 30px;
+  padding: 20px;
 }
 
 .wishlist-card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 10px; /* Ridotto il padding */
-  background-color: #fff;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  text-align: center; /* Centra il contenuto */
-  max-width: 220px; /* Riquadro più piccolo */
-  margin: auto; /* Centra il riquadro */
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.wishlist-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(106, 90, 205, 0.15);
 }
 
 .wishlist-image-link {
   display: block;
-  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  margin-bottom: 15px;
 }
 
 .wishlist-image {
-  width: 100%; /* Usa tutta la larghezza disponibile */
-  max-width: 200px; /* Limita la larghezza massima */
-  height: 250px; /* Altezza proporzionata */
-  object-fit: cover; /* Mantiene le proporzioni */
-  border-radius: 4px;
-  margin: auto; /* Centra l'immagine */
+  width: 100%;
+  height: 380px;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.wishlist-card:hover .wishlist-image {
+  transform: scale(1.05);
 }
 
 .wishlist-details {
-  font-size: 14px;
-  color: #000; /* Testo nero */
-  text-align: center; /* Centra il testo */
+  padding: 15px 0;
 }
 
-.wishlist-title-link {
-  text-decoration: none;
-  color: #000; /* Testo nero */
-  font-weight: bold;
-  transition: color 0.3s;
-}
-
-.wishlist-title-link:hover {
-  color: #6a5acd; /* Colore viola su hover */
+.wishlist-item-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2d2d2d;
+  margin-bottom: 10px;
+  line-height: 1.4;
 }
 
 .wishlist-item-author,
-.wishlist-item-category,
+.wishlist-item-category {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 8px 0;
+}
+
 .wishlist-item-price {
-  margin: 5px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #6a5acd;
+  margin: 12px 0;
 }
 
 .wishlist-remove-btn {
-  background-color: #d9534f;
-  color: white;
+  width: 100%;
+  padding: 12px;
   border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 12px;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  color: white;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 14px;
-  margin-top: 10px;
-  display: block; /* Centra il bottone */
-  margin-left: auto;
-  margin-right: auto;
+  transition: all 0.3s ease;
+  margin-top: 15px;
 }
 
 .wishlist-remove-btn:hover {
-  background-color: #c9302c;
+  background: linear-gradient(45deg, #5a4cba, #4a3ca9);
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
 }
 
 .empty-wishlist {
   text-align: center;
-  padding: 20px;
-  font-size: 16px;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+}
+
+.empty-wishlist p {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 20px;
 }
 
 .continue-shopping-btn {
   display: inline-block;
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #007bff;
+  padding: 15px 30px;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
   color: white;
   text-decoration: none;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .continue-shopping-btn:hover {
-  background-color: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
 }
 
 .loading {
-  font-size: 18px;
-  color: #555;
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2rem;
+  color: #666;
 }
 
 .error {
-  color: red;
-  font-size: 18px;
+  text-align: center;
+  padding: 40px;
+  color: #dc3545;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(220, 53, 69, 0.1);
+}
+
+@media (max-width: 768px) {
+  .wishlist-container {
+    padding: 15px;
+  }
+
+  .wishlist-title {
+    font-size: 2rem;
+  }
+
+  .wishlist-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+
+  .wishlist-image {
+    height: 320px;
+  }
 }
 </style>

@@ -9,23 +9,23 @@ import { onUnmounted } from "vue";
 // Slider data
 const slides = ref([
   {
-    image: "https://placehold.co/1200x400?text=Slide+1",
+    image: "https://placehold.co/1200x407?text=Slide+1",
     title: "Scopri il Meglio della Lettura",
     description:
       "Esplora una vasta selezione di libri per ogni passione e interesse.",
-    link: "https://www.example.com/slide1", // URL di destinazione
+    link: "https://www.example.com/slide1",
   },
   {
-    image: "https://placehold.co/1200x400?text=Slide+2",
+    image: "https://placehold.co/1200x407?text=Slide+2",
     title: "Offerte Esclusive per Te",
     description: "Approfitta di sconti imperdibili sui tuoi libri preferiti.",
-    link: "https://www.example.com/slide2", // URL di destinazione
+    link: "https://www.example.com/slide2",
   },
   {
-    image: "https://placehold.co/1200x400?text=Slide+3",
+    image: "https://placehold.co/1200x407?text=Slide+3",
     title: "Nuovi Arrivi Ogni Settimana",
     description: "Rimani aggiornato con le ultime novità editoriali.",
-    link: "https://www.example.com/slide3", // URL di destinazione
+    link: "https://www.example.com/slide3",
   },
 ]);
 
@@ -299,14 +299,12 @@ onMounted(() => {
       <div class="content-container">
         <!-- Hero Banner / Slider -->
         <div class="hero-banner">
-          <div
-            class="slider"
-            :style="{ '--current-slide': currentSlide }">
+          <div class="slider">
             <div
               v-for="(slide, index) in slides"
               :key="index"
-              class="slide">
-              <!-- Aggiunto il link cliccabile -->
+              class="slide"
+              :class="{ active: index === currentSlide }">
               <a
                 :href="slide.link"
                 target="_blank"
@@ -314,13 +312,11 @@ onMounted(() => {
                 class="slide-link">
                 <img
                   :src="slide.image"
-                  :alt="`Immagine dello slider: ${slide.title}`"
-                  class="slide-image"
-                  loading="lazy" />
+                  :alt="slide.title"
+                  class="slide-image" />
               </a>
             </div>
           </div>
-          <!-- Contenuto testuale dello slider -->
           <div class="slider-text">
             <h2 class="slider-title">{{ slides[currentSlide].title }}</h2>
             <p class="slider-description">
@@ -329,12 +325,14 @@ onMounted(() => {
           </div>
           <button
             class="prev-button"
-            @click="prevSlide">
+            @click="prevSlide"
+            aria-label="Previous slide">
             ❮
           </button>
           <button
             class="next-button"
-            @click="nextSlide">
+            @click="nextSlide"
+            aria-label="Next slide">
             ❯
           </button>
         </div>
@@ -627,6 +625,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background: linear-gradient(to bottom right, #ffffff, #f8f7ff);
 }
 
 main {
@@ -724,161 +723,259 @@ nav.nav-buttons {
 /* Hero Banner Styles */
 .hero-banner {
   position: relative;
+  width: 1200px;
+  height: 407px;
+  margin: 0 auto 40px;
   overflow: hidden;
-  border-radius: 10px;
-  height: 330px; /* Altezza dello slider */
-  margin-top: -45px; /* Ridotto il margine superiore */
-}
-
-.slider-link {
-  display: block;
-  width: 100%;
-  height: 100%;
-  text-decoration: none; /* Rimuove la sottolineatura */
-}
-
-.slider-link:hover {
-  text-decoration: none; /* Rimuove la sottolineatura al passaggio del mouse */
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(106, 90, 205, 0.15);
 }
 
 .slider {
-  display: flex;
-  transition: transform 0.5s ease-in-out;
-  transform: translateX(calc(-100% * var(--current-slide, 0)));
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .slide {
-  min-width: 100%;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.slide.active {
+  opacity: 1;
+}
+
+.slide-link {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .slide-image {
   width: 100%;
-  height: 100%; /* L'immagine occupa tutta l'altezza dello slider */
-  object-fit: cover; /* Assicura che l'immagine si adatti senza deformarsi */
-  border-radius: 10px;
+  height: 100%;
+  object-fit: cover;
 }
 
 .slider-text {
   position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 10; /* Assicura che le scritte siano sopra gli altri elementi */
-  color: white;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
-  background-color: rgba(
-    0,
-    0,
-    0,
-    0.5
-  ); /* Sfondo semi-trasparente per migliorare la leggibilità */
-  padding: 10px 15px; /* Aggiunge spazio interno */
-  border-radius: 8px; /* Arrotonda gli angoli */
-}
-
-.slider-content {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  color: white;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+  bottom: 40px;
+  left: 40px;
+  z-index: 10;
+  max-width: 600px;
+  background: rgba(106, 90, 205, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
 }
 
 .slider-title {
-  font-size: 32px; /* Aumentata la dimensione del titolo */
-  font-weight: 700; /* Reso più audace */
-  margin-bottom: 15px;
-  color: #ffffff; /* Colore bianco per contrasto */
-  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #ffffff;
 }
 
 .slider-description {
-  font-size: 18px; /* Aumentata la dimensione del testo */
-  font-weight: 400; /* Reso più leggibile */
-  color: #f0f0f0; /* Colore leggermente più chiaro */
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Migliorato il contrasto */
-  line-height: 1.5; /* Migliorata la leggibilità */
+  font-size: 18px;
+  color: #ffffff;
+  line-height: 1.5;
 }
 
 .prev-button,
 .next-button {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%); /* Centra verticalmente */
-  background-color: rgba(0, 0, 0, 0.8); /* Colore nero più scuro */
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  background-color: rgba(0, 0, 0, 0.8);
   color: white;
   border: none;
-  padding: 0; /* Rimuove padding extra */
-  cursor: pointer;
   border-radius: 50%;
+  cursor: pointer;
   z-index: 10;
-  font-size: 24px; /* Aumenta la dimensione della freccia */
-  width: 47px; /* Dimensione del pulsante */
-  height: 47px; /* Dimensione del pulsante */
+  font-size: 24px;
   display: flex;
-  align-items: center; /* Centra verticalmente il contenuto */
-  justify-content: center; /* Centra orizzontalmente il contenuto */
-  line-height: 0; /* Rimuove eventuali spazi extra */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.prev-button:hover,
+.next-button:hover {
+  background-color: rgba(0, 0, 0, 0.9);
 }
 
 .prev-button {
-  left: 15px; /* Posiziona la freccia a sinistra */
+  left: 20px;
 }
 
 .next-button {
-  right: 15px; /* Posiziona la freccia a destra */
+  right: 20px;
+}
+
+@media (max-width: 1200px) {
+  .hero-banner {
+    width: 100%;
+    height: 340px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-banner {
+    height: 280px;
+  }
+
+  .slider-text {
+    bottom: 20px;
+    left: 20px;
+    padding: 15px;
+  }
+
+  .slider-title {
+    font-size: 24px;
+  }
+
+  .slider-description {
+    font-size: 16px;
+  }
 }
 
 /* Search Section Styles */
 .search-section {
-  margin-bottom: 40px;
+  margin: 40px 0;
 }
 
 .search-container {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto;
+  gap: 20px;
+  background: white;
+  border: 2px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: linear-gradient(to bottom right, #ffffff, #f8f7ff);
+}
+
+.search-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(106, 90, 205, 0.12);
 }
 
 .search-field {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   padding: 0 15px;
 }
 
+/* Fixed selector syntax */
+.search-field:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 70%;
+  width: 1px;
+  background: rgba(106, 90, 205, 0.2);
+}
+
 .search-field label {
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #222; /* Più scuro per le etichette */
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #6a5acd;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .search-field input {
+  width: 100%;
   border: none;
-  padding: 5px 0;
-  font-size: 14px;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 2px solid rgba(106, 90, 205, 0.2);
+  padding: 12px 0;
+  font-size: 1rem;
+  color: #333;
+  transition: all 0.3s ease;
+  background: transparent;
+}
+
+.search-field input:focus {
+  outline: none;
+  border-bottom-color: #6a5acd;
+}
+
+.search-field input::placeholder {
+  color: #9590d5;
+  font-size: 0.9rem;
 }
 
 .search-button {
-  background-color: #7b68ee;
-  color: black; /* Cambiato da white a black */
-  border: none;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
   align-self: flex-end;
+  width: 50px;
+  height: 50px;
+  background-color: #6a5acd;
+  color: white;
+  border: none;
+  border-radius: 12px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-button i {
+  font-size: 1.2rem;
+}
+
+.search-button:hover {
+  background-color: #5a4cba;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+}
+
+@media (max-width: 768px) {
+  .search-container {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    padding: 20px;
+  }
+
+  .search-field:not(:last-child)::after {
+    display: none;
+  }
+
+  .search-field {
+    padding: 0;
+  }
+
+  .search-button {
+    width: 100%;
+    margin-top: 10px;
+  }
 }
 
 /* Section Header Styles */
 .section-header {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
   position: relative;
+  padding: 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
 .category-indicator {
@@ -891,7 +988,10 @@ nav.nav-buttons {
   display: inline-block;
   width: 20px;
   height: 20px;
-  background-color: #333;
+  background-color: #6a5acd;
+  padding: 8px;
+  border-radius: 8px;
+  color: white;
   margin-right: 8px;
 }
 
@@ -900,9 +1000,11 @@ nav.nav-buttons {
 }
 
 .section-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #222; /* Più scuro per i titoli delle sezioni */
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .navigation-arrows {
@@ -934,16 +1036,18 @@ nav.nav-buttons {
 }
 
 .product-card {
-  border-radius: 8px;
+  background: white;
+  border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
-  border: 1px solid #eee;
+  border: none;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
 .product-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 30px rgba(106, 90, 205, 0.15);
 }
 
 .product-image {
@@ -960,7 +1064,7 @@ nav.nav-buttons {
   position: absolute;
   top: 10px;
   left: 10px;
-  background-color: #db4444;
+  background-color: #6a5acd; /* Changed from #db4444 */
   color: white;
   padding: 2px 8px;
   border-radius: 4px;
@@ -1003,8 +1107,8 @@ nav.nav-buttons {
 }
 
 .favorite-button:hover {
-  background-color: #ffebee;
-  color: #e91e63;
+  background-color: #e8e6f8; /* Changed from #ffebee */
+  color: #6a5acd; /* Changed from #e91e63 */
 }
 
 .cart-button:hover {
@@ -1013,15 +1117,14 @@ nav.nav-buttons {
 }
 
 .product-details {
-  padding: 12px;
-  background-color: white;
+  padding: 20px;
 }
 
 .product-title {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 5px;
-  color: #222; /* Più scuro per i titoli dei prodotti */
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d2d2d;
+  margin-bottom: 10px;
 }
 
 .product-price {
@@ -1030,7 +1133,7 @@ nav.nav-buttons {
 
 .current-price {
   font-weight: 500;
-  color: #db4444;
+  color: #6a5acd; /* Changed from #db4444 */
   margin-right: 5px;
 }
 
@@ -1061,13 +1164,15 @@ nav.nav-buttons {
 .view-all-button {
   display: inline-block;
   text-decoration: none;
-  background-color: #db4444;
-  color: black;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  color: white;
   border: none;
   padding: 12px 30px;
-  border-radius: 4px;
+  border-radius: 12px;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.2);
 }
 
 /* Category/Publisher Grid Styles */
@@ -1085,16 +1190,24 @@ nav.nav-buttons {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e5e5e5;
-  border-radius: 4px;
-  padding: 25px 0;
-  cursor: pointer;
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+  transition: all 0.3s ease;
   color: #333; /* Esplicitamente scuro per il testo delle card */
+}
+
+.category-card:hover,
+.publisher-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(106, 90, 205, 0.15);
 }
 
 .category-card.active,
 .publisher-card.active {
-  background-color: #2b3238;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
   color: white; /* Mantenuto bianco qui perché lo sfondo è scuro */
 }
 
@@ -1146,6 +1259,23 @@ nav.nav-buttons {
   .search-field {
     padding: 0;
   }
+
+  .section-header {
+    padding: 15px;
+  }
+
+  .product-card {
+    border-radius: 12px;
+  }
+
+  .product-details {
+    padding: 15px;
+  }
+
+  .category-card,
+  .publisher-card {
+    padding: 20px;
+  }
 }
 
 @media (max-width: 576px) {
@@ -1169,9 +1299,9 @@ nav.nav-buttons {
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(106, 90, 205, 0.1);
   border-radius: 50%;
   border-top-color: #6a5acd;
   animation: spin 1s infinite ease-in-out;
@@ -1187,34 +1317,50 @@ nav.nav-buttons {
 .error-container {
   text-align: center;
   padding: 40px 0;
-  background-color: #fff3f3;
-  border-radius: 8px;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
 .retry-button {
   margin-top: 15px;
-  background-color: #6a5acd;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
   color: white;
+  padding: 12px 30px;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.2);
 }
 
 .empty-container {
   text-align: center;
   padding: 40px 0;
-  background-color: #f9f9f9;
-  border-radius: 8px;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
 .add-first-book-button {
   display: inline-block;
   margin-top: 15px;
-  background-color: #6a5acd;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
   color: white;
   text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 12px 30px;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: none;
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.2);
+}
+
+.view-all-button:hover,
+.search-button:hover,
+.retry-button:hover,
+.add-first-book-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(106, 90, 205, 0.3);
 }
 </style>
