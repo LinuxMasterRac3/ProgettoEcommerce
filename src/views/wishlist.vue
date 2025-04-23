@@ -274,10 +274,29 @@ onMounted(async () => {
   color: #2d2d2d;
   margin-bottom: 40px;
   text-align: center;
-  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  background: linear-gradient(
+    45deg,
+    #7c4dff,
+    #6200ea
+  ); /* Aggiornato il colore viola */
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  opacity: 0;
+  animation: fadeInUp 1s ease forwards;
+  transform: translateY(20px);
+}
+
+/* Aggiungi questa animazione */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .wishlist-grid {
@@ -344,7 +363,7 @@ onMounted(async () => {
 .wishlist-item-price {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #6a5acd;
+  color: #7c4dff; /* Aggiornato */
   margin: 12px 0;
 }
 
@@ -353,7 +372,7 @@ onMounted(async () => {
   padding: 12px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  background: linear-gradient(45deg, #7c4dff, #6200ea); /* Aggiornato */
   color: white;
   font-weight: 500;
   cursor: pointer;
@@ -362,8 +381,8 @@ onMounted(async () => {
 }
 
 .wishlist-remove-btn:hover {
-  background: linear-gradient(45deg, #5a4cba, #4a3ca9);
-  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+  background: linear-gradient(45deg, #6200ea, #5502c7); /* Aggiornato */
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3); /* Aggiornato */
 }
 
 .empty-wishlist {
@@ -383,7 +402,7 @@ onMounted(async () => {
 .continue-shopping-btn {
   display: inline-block;
   padding: 15px 30px;
-  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  background: linear-gradient(45deg, #7c4dff, #6200ea); /* Aggiornato */
   color: white;
   text-decoration: none;
   border-radius: 12px;
@@ -393,7 +412,7 @@ onMounted(async () => {
 
 .continue-shopping-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3); /* Aggiornato */
 }
 
 .loading {

@@ -284,16 +284,6 @@ const viewProductDetails = (bookId: string) => {
   router.push(`/product/${bookId}`);
 };
 
-// Navigazione alle categorie
-const navigateToCategory = (category: string) => {
-  router.push(`/shop?category=${category}`);
-};
-
-// Navigazione alle case editrici
-const navigateToPublisher = (publisher: string) => {
-  router.push(`/shop?publisher=${publisher}`);
-};
-
 // Fetch books when component is mounted
 onMounted(() => {
   fetchRecentBooks();
@@ -382,11 +372,18 @@ onMounted(() => {
         <!-- Recent Books Section -->
         <section class="product-section">
           <div class="section-header">
-            <div class="category-indicator">
-              <span class="category-icon"></span>
-              <span>Libri</span>
+            <h2 class="section-title">
+              <div class="category-icon"></div>
+              Aggiunti di Recente
+            </h2>
+            <div class="navigation-arrows">
+              <button class="arrow-left">
+                <i class="fas fa-arrow-left"></i>
+              </button>
+              <button class="arrow-right">
+                <i class="fas fa-arrow-right"></i>
+              </button>
             </div>
-            <h2 class="section-title">Aggiunti di Recente</h2>
           </div>
 
           <!-- Loading state -->
@@ -497,14 +494,13 @@ onMounted(() => {
           </div>
         </section>
 
-        <!-- Book Categories Section -->
+        <!-- Sezione Categories -->
         <section class="categories-section">
           <div class="section-header">
-            <div class="category-indicator">
-              <span class="category-icon"></span>
-              <span>Categories</span>
-            </div>
-            <h2 class="section-title">Scegli per tipo di Libro</h2>
+            <h2 class="section-title">
+              <div class="category-icon"></div>
+              Scegli per tipo di Libro
+            </h2>
             <div class="navigation-arrows">
               <button class="arrow-left">
                 <i class="fas fa-arrow-left"></i>
@@ -516,49 +512,37 @@ onMounted(() => {
           </div>
 
           <div class="category-grid">
-            <div
-              class="category-card"
-              @click="navigateToCategory('Fantasy')">
+            <div class="category-card">
               <div class="category-icon">
                 <i class="fas fa-book"></i>
               </div>
               <span class="category-name">Fantasy</span>
             </div>
-            <div
-              class="category-card"
-              @click="navigateToCategory('Saggi')">
+            <div class="category-card">
               <div class="category-icon">
                 <i class="fas fa-desktop"></i>
               </div>
               <span class="category-name">Saggi</span>
             </div>
-            <div
-              class="category-card"
-              @click="navigateToCategory('Biografie')">
+            <div class="category-card">
               <div class="category-icon">
                 <i class="fas fa-clock"></i>
               </div>
               <span class="category-name">Biografie</span>
             </div>
-            <div
-              class="category-card active"
-              @click="navigateToCategory('Gialli')">
+            <div class="category-card active">
               <div class="category-icon">
                 <i class="fas fa-camera"></i>
               </div>
               <span class="category-name">Gialli</span>
             </div>
-            <div
-              class="category-card"
-              @click="navigateToCategory('Horror')">
+            <div class="category-card">
               <div class="category-icon">
                 <i class="fas fa-headphones"></i>
               </div>
               <span class="category-name">Horror</span>
             </div>
-            <div
-              class="category-card"
-              @click="navigateToCategory('rosa')">
+            <div class="category-card">
               <div class="category-icon">
                 <i class="fas fa-gamepad"></i>
               </div>
@@ -567,14 +551,13 @@ onMounted(() => {
           </div>
         </section>
 
-        <!-- Publishers Section -->
+        <!-- Sezione Publishers -->
         <section class="publishers-section">
           <div class="section-header">
-            <div class="category-indicator">
-              <span class="category-icon"></span>
-              <span>Categories</span>
-            </div>
-            <h2 class="section-title">Per Casa Editrice</h2>
+            <h2 class="section-title">
+              <div class="category-icon"></div>
+              Per Casa Editrice
+            </h2>
             <div class="navigation-arrows">
               <button class="arrow-left">
                 <i class="fas fa-arrow-left"></i>
@@ -586,49 +569,37 @@ onMounted(() => {
           </div>
 
           <div class="publisher-grid">
-            <div
-              class="publisher-card"
-              @click="navigateToPublisher('Feltrinelli')">
+            <div class="publisher-card">
               <div class="publisher-icon">
                 <i class="fas fa-book"></i>
               </div>
               <span class="publisher-name">Feltrinelli</span>
             </div>
-            <div
-              class="publisher-card"
-              @click="navigateToPublisher('Ipperboria')">
+            <div class="publisher-card">
               <div class="publisher-icon">
                 <i class="fas fa-desktop"></i>
               </div>
               <span class="publisher-name">Ipperboria</span>
             </div>
-            <div
-              class="publisher-card"
-              @click="navigateToPublisher('Mondadori')">
+            <div class="publisher-card">
               <div class="publisher-icon">
                 <i class="fas fa-clock"></i>
               </div>
               <span class="publisher-name">Mondadori</span>
             </div>
-            <div
-              class="publisher-card active"
-              @click="navigateToPublisher('Giunti')">
+            <div class="publisher-card active">
               <div class="publisher-icon">
                 <i class="fas fa-camera"></i>
               </div>
               <span class="publisher-name">Giunti</span>
             </div>
-            <div
-              class="publisher-card"
-              @click="navigateToPublisher('StarComics')">
+            <div class="publisher-card">
               <div class="publisher-icon">
                 <i class="fas fa-headphones"></i>
               </div>
               <span class="publisher-name">StarComics</span>
             </div>
-            <div
-              class="publisher-card"
-              @click="navigateToPublisher('Panini')">
+            <div class="publisher-card">
               <div class="publisher-icon">
                 <i class="fas fa-gamepad"></i>
               </div>
@@ -1003,62 +974,115 @@ nav.nav-buttons {
 /* Section Header Styles */
 .section-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
-  position: relative;
   padding: 20px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
-.category-indicator {
+.section-title {
   display: flex;
   align-items: center;
-  margin-right: 15px;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
 }
 
 .category-icon {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  background-color: #6a5acd;
-  padding: 8px;
-  border-radius: 8px;
-  color: white;
-  margin-right: 8px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 
-.category-indicator span {
-  color: #333; /* Esplicitamente scuro per il testo dell'indicatore */
-}
-
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  background: linear-gradient(45deg, #6a5acd, #5a4cba);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.category-indicator {
+  display: none;
 }
 
 .navigation-arrows {
-  position: absolute;
-  right: 0;
   display: flex;
   gap: 10px;
+  margin-left: auto;
+}
+
+/* Aggiusta spaziatura delle frecce di navigazione */
+.navigation-arrows {
+  display: flex;
+  gap: 10px;
+  margin-left: auto; /* Spinge le frecce a destra */
 }
 
 .arrow-left,
 .arrow-right {
-  background: none;
+  background: white;
   border: 1px solid #e5e5e5;
-  width: 30px;
-  height: 30px;
+  width: 35px;
+  height: 35px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.arrow-left:hover,
+.arrow-right:hover {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+  border-color: transparent;
+  color: white;
+}
+
+/* Aggiusta lo stile delle card delle categorie e degli editori */
+.category-grid,
+.publisher-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.category-card,
+.publisher-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 25px 20px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.category-card:hover,
+.publisher-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(106, 90, 205, 0.15);
+}
+
+.category-card.active,
+.publisher-card.active {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+/* Aggiusta gli spazi delle sezioni */
+.product-section,
+.categories-section,
+.publishers-section {
+  margin-bottom: 60px;
 }
 
 /* Product Grid Styles */
@@ -1396,5 +1420,22 @@ nav.nav-buttons {
 .add-first-book-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(106, 90, 205, 0.3);
+}
+
+.shop-title {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.add-to-cart-btn {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.add-to-cart-btn:hover {
+  background: linear-gradient(45deg, #6200ea, #5502c7);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3);
+}
+
+.price {
+  color: #7c4dff;
 }
 </style>

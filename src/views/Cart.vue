@@ -890,4 +890,39 @@ const checkout = () => {
   min-width: 30px;
   text-align: center;
 }
+
+.cart-title {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.cart-item-price {
+  color: #7c4dff;
+}
+
+.remove-btn {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.remove-btn:hover {
+  background: linear-gradient(45deg, #6200ea, #5502c7);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3);
+}
+
+.checkout-btn {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.checkout-btn:hover {
+  background: linear-gradient(45deg, #6200ea, #5502c7);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3);
+}
+
+.continue-shopping-btn {
+  background: linear-gradient(45deg, #7c4dff, #6200ea);
+}
+
+.continue-shopping-btn:hover {
+  background: linear-gradient(45deg, #6200ea, #5502c7);
+  box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3);
+}
 </style>
