@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
+import { ref, onMounted, computed, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "../../components/Navbar.vue";
 import Footer from "../../components/footer.vue";
@@ -73,12 +73,14 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Component state
 const route = useRoute();
+const router = useRouter(); // Aggiunta istanza del router
 const productId = route.params.id as string;
 const product = ref<Book | null>(null);
 const seller = ref<User | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 const selectedImageIndex = ref(0); // Track the currently selected image index
+const relatedBooks = ref<Book[]>([]); // Add state for related books
 
 // Funzione per cambiare l'immagine principale quando si clicca su una thumbnail
 const setMainImage = (index: number) => {
@@ -107,6 +109,12 @@ const additionalImages = computed(() => {
   }
   return [];
 });
+
+// Funzione per navigare a un prodotto correlato
+const navigateToRelatedProduct = (bookId: string) => {
+  // Utilizza window.location.href per forzare un refresh completo della pagina
+  window.location.href = `/product/${bookId}`;
+};
 
 // Fetch product details
 const fetchProductDetails = async () => {
@@ -161,6 +169,58 @@ const fetchProductDetails = async () => {
             memberSince: userData.created_at,
           };
         }
+      }
+
+      // Fetch related books with smarter query
+      let query = supabase.from("products").select("*").neq("id", productId);
+
+      // If we have a category, try to find books in the same category
+      if (productData.metadata?.category) {
+        query = query.eq("metadata->>category", productData.metadata.category);
+      }
+      // If we have a publisher, try to find books from the same publisher
+      else if (productData.metadata?.publisher) {
+        query = query.eq(
+          "metadata->>publisher",
+          productData.metadata.publisher
+        );
+      }
+
+      // Fetch related books
+      let { data: relatedBooksData, error: relatedBooksError } =
+        await query.limit(4);
+
+      // If no related books found by category or publisher, fetch any books
+      if (
+        (!relatedBooksData || relatedBooksData.length === 0) &&
+        !relatedBooksError
+      ) {
+        const { data: anyBooks, error: anyBooksError } = await supabase
+          .from("products")
+          .select("*")
+          .neq("id", productId)
+          .limit(4);
+
+        if (!anyBooksError) {
+          relatedBooksData = anyBooks;
+        }
+      }
+
+      if (relatedBooksError) throw relatedBooksError;
+
+      if (relatedBooksData) {
+        relatedBooks.value = relatedBooksData.map((book: any) => ({
+          id: book.id,
+          name: book.name || "Titolo non disponibile",
+          description: book.description || "Descrizione non disponibile",
+          price: parseFloat(book.price) || 0,
+          discountPercentage: book.discount_percentage,
+          rating: book.rating,
+          reviewCount: book.review_count,
+          created_at: book.created_at,
+          user_id: book.user_id,
+          metadata: book.metadata || {},
+        }));
       }
     } else {
       throw new Error("Prodotto non trovato");
@@ -350,23 +410,39 @@ onMounted(() => {
         </div>
 
         <!-- Related products -->
-        <div class="related-products">
+        <div
+          class="related-products"
+          v-if="relatedBooks.length > 0">
           <h2>Prodotti correlati</h2>
           <div class="related-products-list">
             <div
-              v-for="n in 4"
-              :key="n"
-              class="related-product-card">
+              v-for="relatedBook in relatedBooks"
+              :key="relatedBook.id"
+              class="related-product-card"
+              @click="navigateToRelatedProduct(relatedBook.id)">
               <img
-                :src="mainImage"
+                :src="
+                  relatedBook.metadata?.additional_images?.[0] ||
+                  'https://placehold.co/150x150?text=No+Image'
+                "
                 alt="Prodotto correlato"
                 class="related-product-image" />
-              <p class="related-product-name">Nome prodotto</p>
+              <p class="related-product-name">{{ relatedBook.name }}</p>
               <p class="related-product-price">
-                €{{ product.price.toFixed(2) }}
+                €{{ relatedBook.price.toFixed(2) }}
+              </p>
+              <p
+                class="related-product-author"
+                v-if="relatedBook.metadata?.author">
+                {{ relatedBook.metadata.author }}
               </p>
             </div>
           </div>
+        </div>
+        <div
+          v-else-if="!isLoading"
+          class="no-related-products">
+          <p>Non ci sono prodotti correlati disponibili al momento.</p>
         </div>
       </div>
     </div>
@@ -664,6 +740,16 @@ onMounted(() => {
   width: 150px;
   flex-shrink: 0;
   text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.related-product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(106, 90, 205, 0.2);
+  background-color: #f8f7ff;
 }
 
 .related-product-image {
@@ -700,6 +786,12 @@ onMounted(() => {
 
 .add-to-cart-button:hover {
   background-color: #218838;
+}
+
+.no-related-products {
+  margin-top: 20px;
+  font-size: 16px;
+  color: #000;
 }
 
 /* Responsive fixes */

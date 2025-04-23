@@ -284,6 +284,16 @@ const viewProductDetails = (bookId: string) => {
   router.push(`/product/${bookId}`);
 };
 
+// Navigazione alle categorie
+const navigateToCategory = (category: string) => {
+  router.push(`/shop?category=${category}`);
+};
+
+// Navigazione alle case editrici
+const navigateToPublisher = (publisher: string) => {
+  router.push(`/shop?publisher=${publisher}`);
+};
+
 // Fetch books when component is mounted
 onMounted(() => {
   fetchRecentBooks();
@@ -506,37 +516,49 @@ onMounted(() => {
           </div>
 
           <div class="category-grid">
-            <div class="category-card">
+            <div
+              class="category-card"
+              @click="navigateToCategory('Fantasy')">
               <div class="category-icon">
                 <i class="fas fa-book"></i>
               </div>
               <span class="category-name">Fantasy</span>
             </div>
-            <div class="category-card">
+            <div
+              class="category-card"
+              @click="navigateToCategory('Saggi')">
               <div class="category-icon">
                 <i class="fas fa-desktop"></i>
               </div>
               <span class="category-name">Saggi</span>
             </div>
-            <div class="category-card">
+            <div
+              class="category-card"
+              @click="navigateToCategory('Biografie')">
               <div class="category-icon">
                 <i class="fas fa-clock"></i>
               </div>
               <span class="category-name">Biografie</span>
             </div>
-            <div class="category-card active">
+            <div
+              class="category-card active"
+              @click="navigateToCategory('Gialli')">
               <div class="category-icon">
                 <i class="fas fa-camera"></i>
               </div>
               <span class="category-name">Gialli</span>
             </div>
-            <div class="category-card">
+            <div
+              class="category-card"
+              @click="navigateToCategory('Horror')">
               <div class="category-icon">
                 <i class="fas fa-headphones"></i>
               </div>
               <span class="category-name">Horror</span>
             </div>
-            <div class="category-card">
+            <div
+              class="category-card"
+              @click="navigateToCategory('rosa')">
               <div class="category-icon">
                 <i class="fas fa-gamepad"></i>
               </div>
@@ -564,37 +586,49 @@ onMounted(() => {
           </div>
 
           <div class="publisher-grid">
-            <div class="publisher-card">
+            <div
+              class="publisher-card"
+              @click="navigateToPublisher('Feltrinelli')">
               <div class="publisher-icon">
                 <i class="fas fa-book"></i>
               </div>
               <span class="publisher-name">Feltrinelli</span>
             </div>
-            <div class="publisher-card">
+            <div
+              class="publisher-card"
+              @click="navigateToPublisher('Ipperboria')">
               <div class="publisher-icon">
                 <i class="fas fa-desktop"></i>
               </div>
               <span class="publisher-name">Ipperboria</span>
             </div>
-            <div class="publisher-card">
+            <div
+              class="publisher-card"
+              @click="navigateToPublisher('Mondadori')">
               <div class="publisher-icon">
                 <i class="fas fa-clock"></i>
               </div>
               <span class="publisher-name">Mondadori</span>
             </div>
-            <div class="publisher-card active">
+            <div
+              class="publisher-card active"
+              @click="navigateToPublisher('Giunti')">
               <div class="publisher-icon">
                 <i class="fas fa-camera"></i>
               </div>
               <span class="publisher-name">Giunti</span>
             </div>
-            <div class="publisher-card">
+            <div
+              class="publisher-card"
+              @click="navigateToPublisher('StarComics')">
               <div class="publisher-icon">
                 <i class="fas fa-headphones"></i>
               </div>
               <span class="publisher-name">StarComics</span>
             </div>
-            <div class="publisher-card">
+            <div
+              class="publisher-card"
+              @click="navigateToPublisher('Panini')">
               <div class="publisher-icon">
                 <i class="fas fa-gamepad"></i>
               </div>
