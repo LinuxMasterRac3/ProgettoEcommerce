@@ -57,87 +57,30 @@ create policy "Anyone can view images"
 on storage.objects for select
 using (bucket_id = 'images');
 
--- Gli utenti autentFeedback
+-- Gli utenti autenticati possono caricare immagini
+drop policy if exists "Authenticated users can upload images" on storage.objects;
+create policy "Authenticated users can upload images"
+on storage.objects for insert
+with check (bucket_id = 'images' and auth.role() = 'authenticated');
 
-Project overview
-Table Editor
-SQL Editor
-Database
-Authentication
-Storage
-Edge Functions
-Realtime
-Advisors
-Reports
-Logs
-API Docs
-Integrations
-
-    Project Settings
-
-Table Editor
-Search tables
-4
-Auth policies
-id
-name
-description
-price
-image_url
-user_id
-
-Page
-
-of 1
-
-4 records
-definitiondata
-
-Supabase
+-- Gli utenti possono aggiornare o eliminare solo le loro immagini
+drop policy if exists "Users can update own images" on storage.objects;
+create policy "Users can update own images"
+on storage.objects for update
+using (bucket_id = 'images' and auth.uid() = owner);
 
 drop policy if exists "Users can delete own images" on storage.objects;
 create policy "Users can delete own images"
 on storage.objects for delete
 using (bucket_id = 'images' and auth.uid() = owner);
 
--- Funzione per validare che un campo sia un URL del bucket imageFeedback
-
-Project overview
-Table Editor
-SQL Editor
-Database
-Authentication
-Storage
-Edge Functions
-Realtime
-Advisors
-Reports
-Logs
-API Docs
-Integrations
-
-    Project Settings
-
-Table Editor
-Search tables
-4
-Auth policies
-id
-name
-description
-price
-image_url
-user_id
-
-Page
-
-of 1
-
-4 records
-definitiondata
-
-Supabase
-ge/v1/.*images/' OR
+-- Funzione per validare che un campo sia un URL del bucket images
+CREATE OR REPLACE FUNCTION validate_storage_url(url TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- Permetti solo URL del bucket images
+  RETURN url IS NULL OR 
+         url ~ '^https://tiylfyyfitqzwstftzpg\.supabase\.co/storage/v1/.*images/' OR
          url ~ '^/storage/v1/.*images/';
 END;
 $$ LANGUAGE plpgsql;
@@ -159,6 +102,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_storage_url(bucket_name text, path text)
 RETURNS text AS $$
 BEGIN
+  -- Usa l'endpoint S3 corretto come specificato nei logs
   RETURN 'https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/s3/object/public/' || bucket_name || '/' || path;
 END;
 $$ LANGUAGE plpgsql;
@@ -201,7 +145,7 @@ create table IF NOT EXISTS profiles (
 -- Invece di indicizzare direttamente la colonna, crea un indice sul suo hash MD5
 -- questo risolve il problema della dimensione eccessiva dell'indice
 DROP INDEX IF EXISTS idx_profiles_profile_image;
-CREATE INDEX idx_profiles_profile_image_md5 ON profiles(md5(profile_image)) 
+CREATE INDEX IF NOT EXISTS idx_profiles_profile_image_md5 ON profiles(md5(profile_image)) 
   WHERE profile_image IS NOT NULL;
 
 -- Aggiungi un commento sulla colonna profile_image
@@ -254,13 +198,14 @@ create policy "Users can insert their own profile"
   on profiles for insert 
   with check (auth.uid() = id);
 
--- Modifica tabella products per rimuovere completamente image_url
+-- Modifica tabella products per garantire che image_url sia un URL
 DROP TABLE IF EXISTS products CASCADE;  
 create table products (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
   description text,
   price decimal not null,
+  image_url text CHECK (validate_storage_url(image_url)),
   user_id uuid references auth.users not null,
   metadata jsonb,
   status text default 'active',
@@ -268,15 +213,44 @@ create table products (
   updated_at timestamp with time zone default now()
 );
 
--- Rimuovi l'indice sulla colonna image_url
-DROP INDEX IF EXISTS idx_products_image_url_md5;
+-- Usa un indice MD5 anche qui per la performance ed evitare errori di dimensione
+CREATE INDEX idx_products_image_url_md5 ON products(md5(image_url))
+  WHERE image_url IS NOT NULL;
 
--- Rimuovi il trigger per la pulizia delle immagini vecchie dato che ora usiamo metadata
+-- Aggiungi un commento sulla colonna image_url
+COMMENT ON COLUMN products.image_url IS 'URL pubblico dell''immagine nel bucket storage.images (es: https://tiylfyyfitqzwstftzpg.supabase.co/storage/v1/object/public/images/{path})';
+
+-- Trigger per eliminare la vecchia immagine dal bucket quando viene aggiornata in products
+CREATE OR REPLACE FUNCTION cleanup_old_product_image()
+RETURNS TRIGGER AS $$
+DECLARE
+  old_path text;
+BEGIN
+  -- Se c'è una nuova immagine e c'era già un'immagine precedente
+  IF NEW.image_url IS DISTINCT FROM OLD.image_url AND OLD.image_url IS NOT NULL THEN
+    old_path := extract_path_from_storage_url(OLD.image_url);
+    
+    -- Se il percorso è valido, elimina l'oggetto
+    IF old_path IS NOT NULL THEN
+      -- Usa una funzione di supporto esterna o un'estensione come pg_net per chiamare l'API di Storage
+      -- In alternativa, l'applicazione client dovrebbe occuparsi di eliminare i file obsoleti
+      -- Qui si potrebbe registrare l'eliminazione in una tabella di manutenzione
+      INSERT INTO storage_cleanup_queue(object_path, deleted_at, status)
+      VALUES ('images/' || old_path, now(), 'pending');
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Collega il trigger alla tabella products
 DROP TRIGGER IF EXISTS product_image_cleanup_trigger ON products;
-DROP FUNCTION IF EXISTS cleanup_old_product_image();
-
--- Commento sulla struttura metadata per documentare il formato atteso
-COMMENT ON COLUMN products.metadata IS 'Contiene dettagli aggiuntivi come: author, publisher, category, condition, notes, shipping_available, location, additional_images (array di URL delle immagini)';
+CREATE TRIGGER product_image_cleanup_trigger
+BEFORE UPDATE ON products
+FOR EACH ROW
+WHEN (NEW.image_url IS DISTINCT FROM OLD.image_url)
+EXECUTE FUNCTION cleanup_old_product_image();
 
 -- Trigger per aggiornare timestamp updated_at quando si modifica un prodotto
 CREATE OR REPLACE FUNCTION update_modified_column()
@@ -417,3 +391,103 @@ DROP POLICY IF EXISTS "Only admins can access storage cleanup queue" ON storage_
 CREATE POLICY "Only admins can access storage cleanup queue" ON storage_cleanup_queue USING (auth.role() = 'authenticated' AND EXISTS (
   SELECT 1 FROM auth.users WHERE auth.uid() = id AND raw_user_meta_data->>'is_admin' = 'true'
 ));
+
+-- Tabella per le chat
+CREATE TABLE IF NOT EXISTS chats (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users not null,
+  contact_id uuid references auth.users,
+  name text not null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+-- Abilita RLS sulla tabella chats
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+
+-- Policies per le chat
+DROP POLICY IF EXISTS "Users can view their own chats" ON chats;
+DROP POLICY IF EXISTS "Users can insert their own chats" ON chats;
+DROP POLICY IF EXISTS "Users can update their own chats" ON chats;
+DROP POLICY IF EXISTS "Users can delete their own chats" ON chats;
+
+CREATE POLICY "Users can view their own chats" 
+  ON chats FOR SELECT 
+  USING (auth.uid() = user_id OR auth.uid() = contact_id);
+
+CREATE POLICY "Users can insert their own chats" 
+  ON chats FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own chats" 
+  ON chats FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own chats" 
+  ON chats FOR DELETE 
+  USING (auth.uid() = user_id);
+
+-- Tabella per i messaggi
+CREATE TABLE IF NOT EXISTS messages (
+  id uuid default uuid_generate_v4() primary key,
+  chat_id uuid references chats not null,
+  user_id uuid references auth.users not null,
+  text text not null,
+  created_at timestamp with time zone default now(),
+  read boolean default false
+);
+
+-- Abilita RLS sulla tabella messages
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+-- Policies per i messaggi
+DROP POLICY IF EXISTS "Users can view messages in their chats" ON messages;
+DROP POLICY IF EXISTS "Users can insert messages in their chats" ON messages;
+DROP POLICY IF EXISTS "Users can update messages they sent" ON messages;
+DROP POLICY IF EXISTS "Users can delete messages they sent" ON messages;
+
+CREATE POLICY "Users can view messages in their chats" 
+  ON messages FOR SELECT 
+  USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND (chats.user_id = auth.uid() OR chats.contact_id = auth.uid())
+    )
+  );
+
+CREATE POLICY "Users can insert messages in their chats" 
+  ON messages FOR INSERT 
+  WITH CHECK (
+    auth.uid() = user_id AND 
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND (chats.user_id = auth.uid() OR chats.contact_id = auth.uid())
+    )
+  );
+
+CREATE POLICY "Users can update messages they sent" 
+  ON messages FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete messages they sent" 
+  ON messages FOR DELETE 
+  USING (auth.uid() = user_id);
+
+-- Trigger per aggiornare il timestamp della chat quando viene inviato un nuovo messaggio
+CREATE OR REPLACE FUNCTION update_chat_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE chats 
+  SET updated_at = now() 
+  WHERE id = NEW.chat_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_chat_timestamp_trigger ON messages;
+CREATE TRIGGER update_chat_timestamp_trigger
+AFTER INSERT ON messages
+FOR EACH ROW
+EXECUTE FUNCTION update_chat_timestamp();

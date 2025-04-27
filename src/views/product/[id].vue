@@ -116,6 +116,34 @@ const navigateToRelatedProduct = (bookId: string) => {
   window.location.href = `/product/${bookId}`;
 };
 
+// Add this method under the existing methods in the script section
+const contactSeller = () => {
+  if (!product.value) {
+    alert("Informazioni sul prodotto non disponibili");
+    return;
+  }
+
+  // If seller info is not available, we'll still try to use the user_id from the product
+  const sellerId = seller.value?.id || product.value.user_id;
+
+  if (!sellerId) {
+    alert("Informazioni sul venditore non disponibili");
+    return;
+  }
+
+  // Navigate to the contact page with seller information as query parameters
+  router.push({
+    path: "/contact",
+    query: {
+      seller_id: sellerId,
+      seller_name:
+        seller.value?.full_name || seller.value?.username || "Venditore",
+      product_id: product.value.id,
+      product_name: product.value.name,
+    },
+  });
+};
+
 // Fetch product details
 const fetchProductDetails = async () => {
   isLoading.value = true;
@@ -145,28 +173,51 @@ const fetchProductDetails = async () => {
       };
 
       if (productData.user_id) {
-        // Recupera informazioni complete del venditore, inclusa l'immagine di profilo
-        const { data: userData, error: userError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", productData.user_id)
-          .single();
+        try {
+          // Get the user directly from auth.users first to ensure we have an email and basic user info
+          const { data: authUserData, error: authUserError } =
+            await supabase.auth.admin.getUserById(productData.user_id);
 
-        if (!userError && userData) {
+          if (authUserError) {
+            console.error("Error fetching auth user data:", authUserError);
+          }
+
+          // Then get the profile data which might have additional fields
+          const { data: userData, error: userError } = await supabase
+            .from("profiles")
+            .select(
+              "first_name, last_name, phone, description, profile_image, created_at"
+            )
+            .eq("id", productData.user_id)
+            .maybeSingle(); // Use maybeSingle instead of single to handle missing profile gracefully
+
+          if (userError && userError.code !== "PGRST116") {
+            console.error("Error fetching seller profile:", userError);
+          }
+
+          // Merge the data from auth.users and profiles
           seller.value = {
-            id: userData.id,
-            username: userData.username,
-            email: userData.email,
-            full_name:
-              userData.full_name ||
-              (userData.first_name && userData.last_name
-                ? `${userData.first_name} ${userData.last_name}`
-                : "Utente Supabase"),
-            avatar_url: userData.avatar_url || userData.profile_image,
-            location: userData.location,
-            phone: userData.phone,
-            rating: userData.rating,
-            memberSince: userData.created_at,
+            id: productData.user_id,
+            username: authUserData?.user?.user_metadata?.username || "Utente",
+            email: authUserData?.user?.email,
+            full_name: userData
+              ? `${userData.first_name || ""} ${
+                  userData.last_name || ""
+                }`.trim()
+              : authUserData?.user?.user_metadata?.name || "Utente Supabase",
+            avatar_url: userData?.profile_image,
+            location: userData?.location,
+            phone: userData?.phone,
+            rating: 5, // Default rating or from another source
+            memberSince: userData?.created_at || authUserData?.user?.created_at,
+          };
+        } catch (profileError) {
+          console.error("Failed to fetch seller profile:", profileError);
+          // Fallback to a basic seller object
+          seller.value = {
+            id: productData.user_id,
+            username: "Utente",
+            full_name: "Venditore",
           };
         }
       }
@@ -299,7 +350,11 @@ onMounted(() => {
             </p>
             <p class="product-price">Prezzo: €{{ product.price.toFixed(2) }}</p>
             <div class="product-buttons">
-              <button class="contact-button">Contatta il venditore</button>
+              <button
+                class="contact-button"
+                @click="contactSeller">
+                Contatta il venditore
+              </button>
               <button class="buy-button">Acquista ora</button>
               <button
                 class="add-to-cart-button"
