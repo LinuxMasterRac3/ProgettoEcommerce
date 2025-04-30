@@ -12,6 +12,11 @@
         >Aggiungi Libro +</RouterLink
       >
       <RouterLink
+        to="/contact"
+        class="icon"
+        >💬</RouterLink
+      >
+      <RouterLink
         to="/wishlist"
         class="icon"
         >❤️</RouterLink
