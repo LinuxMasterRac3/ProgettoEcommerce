@@ -301,9 +301,13 @@ onMounted(() => {
 
 .books-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(
+    5,
+    1fr
+  ); /* Changed to 5 columns like Shop.vue */
+  gap: 20px;
   justify-content: center;
+  margin-bottom: 30px;
 }
 
 .book-card {
@@ -487,15 +491,28 @@ onMounted(() => {
 }
 
 /* Responsive styles */
+@media (max-width: 1200px) {
+  .books-list {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
   .books-list {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 
+@media (max-width: 992px) {
+  .books-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .books-list {
     grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
   }
 
   .section-header {
@@ -506,6 +523,7 @@ onMounted(() => {
 @media (max-width: 576px) {
   .books-list {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
   .section-header {
