@@ -18,6 +18,134 @@
           </RouterLink>
         </div>
 
+        <!-- Filters Section -->
+        <div class="filters-section">
+          <div class="filters-container">
+            <div class="filter-group">
+              <label for="categoryFilter">Categoria</label>
+              <select
+                id="categoryFilter"
+                v-model="filters.category">
+                <option value="">Tutte le categorie</option>
+                <option value="fantasy">Fantasy</option>
+                <option value="saggi">Saggi</option>
+                <option value="biografie">Biografie</option>
+                <option value="gialli">Gialli</option>
+                <option value="horror">Horror</option>
+                <option value="rosa">Romanzi Rosa</option>
+                <option value="scifi">Fantascienza</option>
+                <option value="manga">Manga</option>
+                <option value="bambini">Libri per Bambini</option>
+                <option value="narrativa">Narrativa</option>
+                <option value="thriller">Thriller</option>
+                <option value="storico">Romanzo Storico</option>
+                <option value="distopico">Distopico</option>
+                <option value="poesia">Poesia</option>
+                <option value="fumetti">Fumetti</option>
+                <option value="religione">Religione</option>
+                <option value="filosofia">Filosofia</option>
+                <option value="cucina">Cucina</option>
+                <option value="arte">Arte</option>
+                <option value="musica">Musica</option>
+                <option value="viaggi">Viaggi</option>
+                <option value="sport">Sport</option>
+                <option value="economia">Economia</option>
+                <option value="psicologia">Psicologia</option>
+                <option value="storia">Storia</option>
+                <option value="scienza">Scienza</option>
+                <option value="tecnologia">Tecnologia</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="publisherFilter">Casa Editrice</label>
+              <select
+                id="publisherFilter"
+                v-model="filters.publisher">
+                <option value="">Tutte le case editrici</option>
+                <option value="feltrinelli">Feltrinelli</option>
+                <option value="mondadori">Mondadori</option>
+                <option value="einaudi">Einaudi</option>
+                <option value="adelphi">Adelphi</option>
+                <option value="giunti">Giunti</option>
+                <option value="bompiani">Bompiani</option>
+                <option value="starcomics">Star Comics</option>
+                <option value="panini">Panini Comics</option>
+                <option value="ipperboria">Ipperboria</option>
+                <option value="rizzoli">Rizzoli</option>
+                <option value="laterza">Laterza</option>
+                <option value="sperling">Sperling & Kupfer</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="conditionFilter">Condizione</label>
+              <select
+                id="conditionFilter"
+                v-model="filters.condition">
+                <option value="">Tutte le condizioni</option>
+                <option value="nuovo">Nuovo</option>
+                <option value="comeNuovo">Come Nuovo</option>
+                <option value="buone">Buone Condizioni</option>
+                <option value="usato">Usato</option>
+                <option value="dannegiato">Danneggiato</option>
+              </select>
+            </div>
+
+            <div class="filter-group price-filter">
+              <label>Prezzo</label>
+              <div class="price-range">
+                <input
+                  type="number"
+                  v-model="filters.minPrice"
+                  placeholder="Min €"
+                  min="0"
+                  step="0.01" />
+                <span class="price-separator">-</span>
+                <input
+                  type="number"
+                  v-model="filters.maxPrice"
+                  placeholder="Max €"
+                  min="0"
+                  step="0.01" />
+              </div>
+            </div>
+
+            <div class="filter-group location-filter">
+              <label for="locationFilter">Località</label>
+              <input
+                type="text"
+                id="locationFilter"
+                v-model="filters.location"
+                placeholder="Filtra per località" />
+            </div>
+
+            <div class="filter-group shipping-filter">
+              <div class="checkbox-container">
+                <input
+                  type="checkbox"
+                  id="shippingFilter"
+                  v-model="filters.shippingAvailable" />
+                <label for="shippingFilter"
+                  >Solo con spedizione disponibile</label
+                >
+              </div>
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button
+              class="apply-filters-btn"
+              @click="applyFilters">
+              <i class="fas fa-filter"></i> Applica Filtri
+            </button>
+            <button
+              class="reset-filters-btn"
+              @click="resetFilters">
+              <i class="fas fa-undo"></i> Reimposta
+            </button>
+          </div>
+        </div>
+
         <!-- Loading State -->
         <div
           v-if="loading"
@@ -35,6 +163,18 @@
             @click="fetchBooks"
             class="retry-button">
             Riprova
+          </button>
+        </div>
+
+        <!-- No Results Message -->
+        <div
+          v-else-if="books.length === 0"
+          class="no-results-container">
+          <p>Nessun libro trovato con i filtri selezionati.</p>
+          <button
+            @click="resetFilters"
+            class="reset-filters-button">
+            Reimposta filtri
           </button>
         </div>
 
@@ -102,6 +242,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Results Count -->
+        <div
+          v-if="!loading && !error && books.length > 0"
+          class="results-count">
+          {{ books.length }} libri trovati
+        </div>
       </div>
     </div>
 
@@ -111,7 +258,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, reactive } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar.vue";
@@ -138,6 +285,17 @@ interface Book {
   };
 }
 
+// Filter state
+interface Filters {
+  category: string;
+  publisher: string;
+  condition: string;
+  minPrice: number | null;
+  maxPrice: number | null;
+  location: string;
+  shippingAvailable: boolean;
+}
+
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
 const supabaseKey =
@@ -150,16 +308,77 @@ const books = ref<Book[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-// Fetch all books from the database
+// Initialize filters
+const filters = reactive<Filters>({
+  category: "",
+  publisher: "",
+  condition: "",
+  minPrice: null,
+  maxPrice: null,
+  location: "",
+  shippingAvailable: false,
+});
+
+// Reset filters to default values
+const resetFilters = () => {
+  filters.category = "";
+  filters.publisher = "";
+  filters.condition = "";
+  filters.minPrice = null;
+  filters.maxPrice = null;
+  filters.location = "";
+  filters.shippingAvailable = false;
+  fetchBooks(); // Fetch all books without filters
+};
+
+// Apply current filters and fetch books
+const applyFilters = () => {
+  fetchBooks();
+};
+
+// Fetch books with applied filters
 const fetchBooks = async () => {
   loading.value = true;
   error.value = null;
 
   try {
-    // Changed from "books" to "products" to match Shop.vue
-    const { data, error: fetchError } = await supabase
-      .from("products")
-      .select("*");
+    // Start building the query
+    let query = supabase.from("products").select("*");
+
+    // Apply category filter
+    if (filters.category) {
+      query = query.eq("metadata->>category", filters.category);
+    }
+
+    // Apply publisher filter
+    if (filters.publisher) {
+      query = query.eq("metadata->>publisher", filters.publisher);
+    }
+
+    // Apply condition filter
+    if (filters.condition) {
+      query = query.eq("metadata->>condition", filters.condition);
+    }
+
+    // Apply price range filters
+    if (filters.minPrice !== null) {
+      query = query.gte("price", filters.minPrice);
+    }
+    if (filters.maxPrice !== null) {
+      query = query.lte("price", filters.maxPrice);
+    }
+
+    // Apply location filter (case insensitive partial match)
+    if (filters.location) {
+      query = query.ilike("metadata->>location", `%${filters.location}%`);
+    }
+
+    // Apply shipping availability filter
+    if (filters.shippingAvailable) {
+      query = query.eq("metadata->>shipping_available", "true");
+    }
+
+    const { data, error: fetchError } = await query;
 
     if (fetchError) throw fetchError;
 
@@ -299,12 +518,117 @@ onMounted(() => {
   background-color: rgba(106, 90, 205, 0.1);
 }
 
+/* Filter styles */
+.filters-section {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+}
+
+.filters-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.filter-group label {
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.filter-group select,
+.filter-group input[type="text"],
+.filter-group input[type="number"] {
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: #6a5acd;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(106, 90, 205, 0.2);
+}
+
+.price-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.price-range input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.price-separator {
+  color: #6a5acd;
+  font-weight: bold;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.filter-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.apply-filters-btn,
+.reset-filters-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.apply-filters-btn {
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  color: white;
+}
+
+.reset-filters-btn {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.apply-filters-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+}
+
+.reset-filters-btn:hover {
+  background-color: #e5e5e5;
+}
+
 .books-list {
   display: grid;
-  grid-template-columns: repeat(
-    5,
-    1fr
-  ); /* Changed to 5 columns like Shop.vue */
+  grid-template-columns: repeat(5, 1fr);
   gap: 20px;
   justify-content: center;
   margin-bottom: 30px;
@@ -473,6 +797,30 @@ onMounted(() => {
   box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
 }
 
+.no-results-container {
+  text-align: center;
+  padding: 40px 0;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(106, 90, 205, 0.08);
+}
+
+.reset-filters-button {
+  margin-top: 15px;
+  background: linear-gradient(45deg, #6a5acd, #5a4cba);
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reset-filters-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+}
+
 .retry-button {
   margin-top: 15px;
   background: linear-gradient(45deg, #6a5acd, #5a4cba);
@@ -490,16 +838,22 @@ onMounted(() => {
   box-shadow: 0 6px 20px rgba(106, 90, 205, 0.3);
 }
 
+.results-count {
+  text-align: right;
+  margin-top: 10px;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
 /* Responsive styles */
 @media (max-width: 1200px) {
   .books-list {
     grid-template-columns: repeat(4, 1fr);
   }
-}
 
-@media (max-width: 1024px) {
-  .books-list {
-    grid-template-columns: repeat(4, 1fr);
+  .filters-container {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -511,8 +865,12 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .books-list {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 15px;
+  }
+
+  .filters-container {
+    grid-template-columns: 1fr;
   }
 
   .section-header {
@@ -522,7 +880,7 @@ onMounted(() => {
 
 @media (max-width: 576px) {
   .books-list {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(1, 1fr);
     gap: 10px;
   }
 
@@ -534,6 +892,15 @@ onMounted(() => {
 
   .back-button {
     align-self: flex-start;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+  }
+
+  .apply-filters-btn,
+  .reset-filters-btn {
+    width: 100%;
   }
 }
 </style>
