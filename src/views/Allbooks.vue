@@ -113,11 +113,57 @@
 
             <div class="filter-group location-filter">
               <label for="locationFilter">Località</label>
-              <input
-                type="text"
-                id="locationFilter"
-                v-model="filters.location"
-                placeholder="Filtra per località" />
+              <div class="location-input-container">
+                <input
+                  type="text"
+                  id="locationFilter"
+                  v-model="locationInput"
+                  @input="handleLocationInput"
+                  @focus="showSuggestions = true"
+                  @blur="handleLocationBlur"
+                  @keydown.down.prevent="navigateSuggestions('down')"
+                  @keydown.up.prevent="navigateSuggestions('up')"
+                  @keydown.enter.prevent="
+                    selectSuggestion(selectedSuggestionIndex)
+                  "
+                  @keydown.esc="showSuggestions = false"
+                  placeholder="Filtra per località"
+                  autocomplete="off" />
+
+                <div
+                  v-if="showSuggestions && filteredComuni.length > 0"
+                  class="comuni-suggestions">
+                  <div
+                    v-for="(comune, index) in filteredComuni"
+                    :key="comune.codice"
+                    @mousedown="selectSuggestion(index)"
+                    :class="[
+                      'comune-suggestion',
+                      { selected: index === selectedSuggestionIndex },
+                    ]">
+                    <span class="comune-name">{{ comune.nome }}</span>
+                    <span
+                      class="provincia-sigla"
+                      v-if="
+                        comune.provincia &&
+                        comune.provincia.sigla &&
+                        comune.provincia.sigla.length === 2
+                      ">
+                      ({{ comune.provincia.sigla }})
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  v-if="
+                    showSuggestions &&
+                    locationInput &&
+                    filteredComuni.length === 0
+                  "
+                  class="no-suggestions">
+                  Nessun comune trovato
+                </div>
+              </div>
             </div>
 
             <div class="filter-group shipping-filter">
@@ -453,6 +499,237 @@ const addToCart = async (bookId: string, event: Event) => {
   }
 };
 
+// Add these at the script setup level
+const locationInput = ref("");
+const filteredComuni = ref([]);
+const comuni = ref([]);
+const showSuggestions = ref(false);
+const selectedSuggestionIndex = ref(-1);
+const isLoadingComuni = ref(false);
+const comuniError = ref(null);
+
+// Database of provinces for main Italian cities - copy from AggiungiLibro.vue
+const provinceMap = {
+  Roma: { nome: "Roma", sigla: "RM" },
+  Milano: { nome: "Milano", sigla: "MI" },
+  Napoli: { nome: "Napoli", sigla: "NA" },
+  Torino: { nome: "Torino", sigla: "TO" },
+  Palermo: { nome: "Palermo", sigla: "PA" },
+  Genova: { nome: "Genova", sigla: "GE" },
+  Bologna: { nome: "Bologna", sigla: "BO" },
+  Firenze: { nome: "Firenze", sigla: "FI" },
+  Bari: { nome: "Bari", sigla: "BA" },
+  Catania: { nome: "Catania", sigla: "CT" },
+  // Add more from AggiungiLibro.vue as needed
+};
+
+// Fetch Italian communes
+const fetchComuni = async () => {
+  try {
+    isLoadingComuni.value = true;
+    comuniError.value = null;
+
+    // Check if we have cached data
+    const cachedData = localStorage.getItem("comuni-cache");
+    const cacheTimestamp = localStorage.getItem("comuni-cache-timestamp");
+
+    // Use cache if valid (less than 24 hours old)
+    if (
+      cachedData &&
+      cacheTimestamp &&
+      Date.now() - parseInt(cacheTimestamp) < 24 * 60 * 60 * 1000
+    ) {
+      comuni.value = JSON.parse(cachedData);
+      return;
+    }
+
+    // Fetch from API if no valid cache
+    const response = await fetch(
+      "https://raw.githubusercontent.com/matteocontrini/comuni-json/master/comuni.json"
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error loading communes: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Clean and normalize data - matching AggiungiLibro's approach
+    const normalizedData = data
+      .filter((comune) => comune && comune.nome)
+      .map((comune) => {
+        // Check if the city is in our province database
+        const comuneName = comune.nome.trim();
+        if (provinceMap[comuneName]) {
+          comune.provincia = {
+            nome: provinceMap[comuneName].nome,
+            sigla: provinceMap[comuneName].sigla,
+          };
+          return comune;
+        }
+
+        // Handle cases where province is not correctly defined
+        if (
+          !comune.provincia ||
+          !comune.provincia.sigla ||
+          comune.provincia.sigla === "??" ||
+          comune.provincia.sigla.length !== 2
+        ) {
+          // Try to extract province from name
+          const provinceMatch = comune.nome.match(/\s*\(([A-Z]{2})\)\s*$/);
+          if (provinceMatch && provinceMatch[1]) {
+            comune.provincia = {
+              nome: "Provincia di " + provinceMatch[1],
+              sigla: provinceMatch[1],
+            };
+            return comune;
+          }
+
+          // Try to deduce province from city name
+          for (const [city, province] of Object.entries(provinceMap)) {
+            if (
+              comune.nome.includes(city) ||
+              comune.nome.startsWith(city + " ")
+            ) {
+              comune.provincia = {
+                nome: province.nome,
+                sigla: province.sigla,
+              };
+              return comune;
+            }
+          }
+
+          // Set generic value if we can't determine the province
+          comune.provincia = {
+            nome: "Provincia non specificata",
+            sigla: "",
+          };
+        }
+
+        return comune;
+      });
+
+    // Additional check to remove question marks
+    for (const comune of normalizedData) {
+      if (comune.provincia && comune.provincia.sigla === "??") {
+        comune.provincia.sigla = "";
+      }
+    }
+
+    comuni.value = normalizedData;
+
+    // Save to cache
+    try {
+      localStorage.setItem("comuni-cache", JSON.stringify(normalizedData));
+      localStorage.setItem("comuni-cache-timestamp", Date.now().toString());
+    } catch (e) {
+      console.warn("Unable to save communes to cache:", e);
+    }
+  } catch (error) {
+    console.error("Error loading communes:", error);
+    comuniError.value = error.message;
+  } finally {
+    isLoadingComuni.value = false;
+  }
+};
+
+// Filter communes based on input
+const handleLocationInput = () => {
+  if (locationInput.value.length < 2) {
+    filteredComuni.value = [];
+    filters.location = locationInput.value; // Update filter as typing
+    return;
+  }
+
+  const input = locationInput.value.toLowerCase().trim();
+
+  filteredComuni.value = comuni.value
+    .filter((comune) => {
+      // Search in both city name and province
+      const matchesName = comune.nome.toLowerCase().includes(input);
+      const matchesProvincia =
+        comune.provincia &&
+        (comune.provincia.nome.toLowerCase().includes(input) ||
+          comune.provincia.sigla.toLowerCase() === input);
+
+      return matchesName || matchesProvincia;
+    })
+    .sort((a, b) => {
+      // Sort results, prioritizing matches that start with the query
+      const aStartsWithQuery = a.nome.toLowerCase().startsWith(input);
+      const bStartsWithQuery = b.nome.toLowerCase().startsWith(input);
+
+      if (aStartsWithQuery && !bStartsWithQuery) return -1;
+      if (!aStartsWithQuery && bStartsWithQuery) return 1;
+
+      return a.nome.localeCompare(b.nome);
+    })
+    .slice(0, 10); // Limit to 10 results
+
+  selectedSuggestionIndex.value = -1;
+  showSuggestions.value = true;
+
+  // Update the filter with the current input
+  filters.location = locationInput.value;
+};
+
+// Handle selecting a commune from suggestions
+const selectSuggestion = (index) => {
+  if (index >= 0 && index < filteredComuni.value.length) {
+    const selectedComune = filteredComuni.value[index];
+
+    // Check if city is in the main database
+    if (provinceMap[selectedComune.nome]) {
+      const provinciaCorretta = provinceMap[selectedComune.nome];
+      locationInput.value = `${selectedComune.nome} (${provinciaCorretta.sigla})`;
+    }
+    // Otherwise use the existing data if valid
+    else if (
+      selectedComune.provincia &&
+      selectedComune.provincia.sigla &&
+      selectedComune.provincia.sigla.length === 2 &&
+      selectedComune.provincia.sigla !== "??"
+    ) {
+      locationInput.value = `${selectedComune.nome} (${selectedComune.provincia.sigla})`;
+    }
+    // Fallback: use only city name
+    else {
+      locationInput.value = selectedComune.nome;
+    }
+
+    filters.location = locationInput.value;
+    showSuggestions.value = false;
+  }
+};
+
+// Navigate suggestions with up/down keys
+const navigateSuggestions = (direction) => {
+  if (filteredComuni.value.length === 0) return;
+
+  if (direction === "down") {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value < filteredComuni.value.length - 1
+        ? selectedSuggestionIndex.value + 1
+        : 0;
+  } else {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value > 0
+        ? selectedSuggestionIndex.value - 1
+        : filteredComuni.value.length - 1;
+  }
+};
+
+// Handle input blur
+const handleLocationBlur = () => {
+  // Delay closing to allow clicking on suggestions
+  setTimeout(() => {
+    showSuggestions.value = false;
+  }, 200);
+
+  // Update filter with current input
+  filters.location = locationInput.value;
+};
+
 // Fetch books when the component is mounted
 onMounted(() => {
   // Check for query parameters from the search form
@@ -465,10 +742,14 @@ onMounted(() => {
   }
 
   if (query.location) {
-    filters.location = String(query.location);
+    locationInput.value = String(query.location);
+    filters.location = locationInput.value;
   }
 
   // For search query, we'll handle it directly in fetchBooks
+
+  // Fetch communes
+  fetchComuni();
 
   // Fetch books with the applied filters
   fetchBooks();
@@ -927,5 +1208,62 @@ onMounted(() => {
   .reset-filters-btn {
     width: 100%;
   }
+}
+
+/* Add these styles for the location search */
+.location-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.comuni-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.comune-suggestion {
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.comune-suggestion:hover {
+  background-color: #f5f5f5;
+}
+
+.comune-suggestion.selected {
+  background-color: #e8e8fd;
+}
+
+.comune-name {
+  font-weight: 500;
+}
+
+.provincia-sigla {
+  color: #666;
+  font-size: 0.9em;
+}
+
+.no-suggestions {
+  padding: 10px 15px;
+  color: #666;
+  font-style: italic;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
 }
 </style>
