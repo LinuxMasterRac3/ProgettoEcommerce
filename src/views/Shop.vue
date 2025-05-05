@@ -487,7 +487,7 @@ onMounted(() => {
             v-if="recentBooks.length > 0"
             class="view-all-container">
             <RouterLink
-              to="/shop"
+              to="/allbooks"
               class="view-all-button">
               Vedi Tutti i Libri
             </RouterLink>

@@ -88,6 +88,12 @@ const router = createRouter({
       name: "allbooks",
       component: () => import("../views/Allbooks.vue"),
     },
+    // Add this route to your router configuration
+    {
+      path: "/allbooks",
+      name: "Allbooks",
+      component: () => import("../views/Allbooks.vue"),
+    },
   ],
 });
 
