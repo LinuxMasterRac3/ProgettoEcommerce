@@ -111,8 +111,20 @@ const error = ref<string | null>(null);
 
 // Search functionality
 const searchProducts = () => {
-  // Search functionality implementation
-  console.log("Searching with:", searchData.value);
+  const queryParams = {};
+
+  // Add any non-empty search parameters to the query
+  if (searchData.value.query) queryParams.query = searchData.value.query;
+  if (searchData.value.category)
+    queryParams.category = searchData.value.category;
+  if (searchData.value.location)
+    queryParams.location = searchData.value.location;
+
+  // Navigate to Allbooks with the query parameters
+  router.push({
+    path: "/allbooks",
+    query: queryParams,
+  });
 };
 
 // Fetch recent books from the database

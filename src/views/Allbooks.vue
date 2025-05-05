@@ -259,7 +259,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink, useRouter, useRoute } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar.vue";
 import Footer from "@/components/footer.vue";
@@ -302,6 +302,7 @@ const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpeWxmeXlmaXRxendzdGZ0enBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNjYyNDcsImV4cCI6MjA1Njc0MjI0N30.CvIx_vI-KGGcFlcZy66-DIC8Itk03Olw3lzEMhnJP_c";
 const supabase = createClient(supabaseUrl, supabaseKey);
 const router = useRouter();
+const route = useRoute();
 
 // State variables
 const books = ref<Book[]>([]);
@@ -378,6 +379,14 @@ const fetchBooks = async () => {
       query = query.eq("metadata->>shipping_available", "true");
     }
 
+    // Handle search query from Shop.vue
+    if (route.query.query) {
+      // Using ilike for case-insensitive partial matching in the book name or description
+      query = query.or(
+        `name.ilike.%${route.query.query}%, description.ilike.%${route.query.query}%`
+      );
+    }
+
     const { data, error: fetchError } = await query;
 
     if (fetchError) throw fetchError;
@@ -446,6 +455,22 @@ const addToCart = async (bookId: string, event: Event) => {
 
 // Fetch books when the component is mounted
 onMounted(() => {
+  // Check for query parameters from the search form
+  const query = route.query;
+
+  // Apply any query parameters to the filters
+  if (query.category) {
+    // Try to match the category with available options
+    filters.category = String(query.category);
+  }
+
+  if (query.location) {
+    filters.location = String(query.location);
+  }
+
+  // For search query, we'll handle it directly in fetchBooks
+
+  // Fetch books with the applied filters
   fetchBooks();
 });
 </script>
