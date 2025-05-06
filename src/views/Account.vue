@@ -8,7 +8,6 @@
       class="account-container"
       v-if="user">
       <h1>Il Mio Account</h1>
-
       <div
         v-if="loading"
         class="loading">
@@ -47,7 +46,14 @@
                 </div>
               </div>
               <div class="image-upload">
-                <label for="profileImage">Carica immagine profilo</label>
+                <!-- Mostra il testo solo se non c'è un'immagine caricata -->
+                <label
+                  v-if="!profileData.profile_image"
+                  for="profileImage"
+                  >Carica immagine profilo</label
+                >
+
+                <!-- Cambia il testo del pulsante in base alla presenza dell'immagine -->
                 <input
                   id="profileImage"
                   type="file"
@@ -66,6 +72,11 @@
                   {{ imageInfo }}
                 </p>
               </div>
+              <button
+                @click="logout"
+                class="logout-btn">
+                Esci
+              </button>
             </div>
 
             <div class="form-group">
@@ -436,6 +447,10 @@
         Vai al Login
       </button>
     </div>
+    <div class="login-message">
+      Se non hai un account, puoi registrarti
+      <router-link to="/register">qui</router-link>.
+    </div>
     <!-- Aggiungi Footer se necessario -->
     <!-- <Footer /> -->
   </div>
@@ -529,13 +544,24 @@ onMounted(async () => {
   await fetchUserData();
 });
 
+const logout = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    user.value = null;
+    router.push("/login");
+  } catch (err) {
+    errorMessage.value = "Errore durante il logout. Riprova più tardi.";
+    console.error("Errore durante il logout:", err.message);
+  }
+};
+
 const fetchUserData = async () => {
   loading.value = true;
   errorMessage.value = "";
-  successMessage.value = ""; // Pulisci messaggi precedenti
+  successMessage.value = "";
 
   try {
-    // Esegui tutte le chiamate in parallelo per velocità
     await Promise.all([
       fetchProfile(),
       fetchAddresses(),
@@ -544,9 +570,7 @@ const fetchUserData = async () => {
       fetchReviews(),
     ]);
   } catch (error) {
-    errorMessage.value =
-      "Errore nel caricamento dei dati dell'account: " +
-      (error.message || error);
+    errorMessage.value = `Errore nel caricamento dei dati dell'account: ${error.message}`;
     console.error("Error fetching user data:", error);
   } finally {
     loading.value = false;
@@ -605,69 +629,29 @@ const updateProfile = async () => {
 
   try {
     const profileUpdates = {
-      id: user.value.id, // Necessario per upsert
-      user_id: user.value.id, // Assicurati che user_id sia presente se è una colonna richiesta
-      first_name: profileData.value.first_name || null, // Usa null se vuoto per evitare errori DB
+      id: user.value.id,
+      user_id: user.value.id,
+      first_name: profileData.value.first_name || null,
       last_name: profileData.value.last_name || null,
       phone: profileData.value.phone || null,
       description: profileData.value.description || null,
-      profile_image: profileData.value.profile_image || null, // Immagine corrente (URL o Base64 o null)
+      profile_image: profileData.value.profile_image || null, // Salva l'immagine
       updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
       .from("profiles")
-      .upsert(profileUpdates, { onConflict: "id" }) // Specifica la colonna per il conflitto
+      .upsert(profileUpdates, { onConflict: "id" })
       .select()
-      .single(); // Prendine uno solo
+      .single();
 
-    if (error) {
-      // Prova a gestire l'errore specifico della colonna immagine se il DB non la supporta
-      if (
-        error.message.includes("profile_image") &&
-        profileUpdates.profile_image?.startsWith("data:image")
-      ) {
-        console.warn(
-          "Tentativo di salvare Base64 fallito, riprovo senza immagine."
-        );
-        profileUpdates.profile_image = null; // Rimuovi l'immagine base64
-        const { error: retryError } = await supabase
-          .from("profiles")
-          .upsert(profileUpdates, { onConflict: "id" })
-          .select()
-          .single();
-        if (retryError) throw retryError; // Lancia l'errore del secondo tentativo
-        successMessage.value =
-          "Profilo aggiornato (immagine Base64 non supportata dal DB)";
-        errorMessage.value =
-          "Il database non sembra supportare il salvataggio di immagini Base64.";
-      } else {
-        throw error; // Lancia altri errori
-      }
-    } else {
-      // Aggiorna i dati locali con quelli ritornati dal DB (potrebbero essere stati modificati)
-      profileData.value = { ...profileData.value, ...data };
-      if (data.profile_image) {
-        imagePreview.value = data.profile_image;
-        imageInfo.value = useStorageBucket.value
-          ? `Immagine su: ${storageConfig.bucketName}`
-          : "Immagine salvata (Base64)";
-      } else {
-        imagePreview.value = "";
-        imageInfo.value = "";
-      }
-      successMessage.value = "Profilo aggiornato con successo!";
-    }
+    if (error) throw error;
 
-    setTimeout(() => {
-      successMessage.value = "";
-      errorMessage.value = "";
-    }, 4000);
+    profileData.value = { ...profileData.value, ...data };
+    successMessage.value = "Profilo aggiornato con successo!";
   } catch (error) {
-    console.error("Error updating profile:", error);
-    errorMessage.value = `Errore aggiornamento profilo: ${
-      error.message || error
-    }`;
+    console.error("Errore aggiornamento profilo:", error);
+    errorMessage.value = `Errore aggiornamento profilo: ${error.message}`;
   } finally {
     loading.value = false;
   }
@@ -679,103 +663,50 @@ const handleImageUpload = async (event) => {
 
   imageInfo.value = "";
   errorMessage.value = "";
-  successMessage.value = ""; // Pulisci messaggi
-  loading.value = true; // Mostra caricamento
-
-  // Validazione
-  if (!file.type.startsWith("image/")) {
-    errorMessage.value = "Seleziona un file immagine valido.";
-    loading.value = false;
-    return;
-  }
-  if (file.size > maxImageSize) {
-    errorMessage.value = `Immagine troppo grande (max ${(
-      maxImageSize /
-      1024 /
-      1024
-    ).toFixed(1)}MB).`;
-    loading.value = false;
-    return;
-  }
+  successMessage.value = "";
+  loading.value = true;
 
   try {
-    // Ottimizza e ottieni Base64 per l'anteprima
-    const optimizedBase64 = await processAndOptimizeImage(file);
-    imagePreview.value = optimizedBase64; // Mostra subito l'anteprima
+    // Validazione
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Seleziona un file immagine valido.");
+    }
+    if (file.size > maxImageSize) {
+      throw new Error(
+        `Immagine troppo grande (max ${(maxImageSize / 1024 / 1024).toFixed(
+          1
+        )}MB).`
+      );
+    }
 
-    // Decide se usare Storage o Base64
+    // Ottimizza immagine
+    const optimizedBase64 = await processAndOptimizeImage(file);
+    imagePreview.value = optimizedBase64;
+
     if (useStorageBucket.value) {
       try {
-        // Prova a caricare su Storage
         const imageUrl = await uploadImageToStorage(file);
-        profileData.value.profile_image = imageUrl; // Salva l'URL
+        profileData.value.profile_image = imageUrl; // Salva l'URL nel profilo
         imageInfo.value = `Immagine caricata su: ${storageConfig.bucketName}`;
-        // Potresti voler rimuovere la vecchia immagine dallo storage qui, se presente
       } catch (storageError) {
-        console.error(
+        console.warn(
           "Errore upload su Storage, fallback a Base64:",
           storageError
         );
-        // Fallback a Base64 se lo storage fallisce
-        profileData.value.profile_image = optimizedBase64;
-        imageInfo.value = `Caricamento Storage fallito. Salvataggio come Base64 (${Math.round(
-          (optimizedBase64.length * 0.75) / 1024
-        )}KB).`;
-        errorMessage.value =
-          "Errore caricamento su storage. Immagine salvata localmente.";
+        profileData.value.profile_image = optimizedBase64; // Fallback a Base64
+        imageInfo.value = `Caricamento Storage fallito. Salvataggio come Base64.`;
       }
     } else {
-      // Usa Base64 direttamente
-      profileData.value.profile_image = optimizedBase64;
-      imageInfo.value = `Immagine salvata (Base64 - ${Math.round(
-        (optimizedBase64.length * 0.75) / 1024
-      )}KB)`;
+      profileData.value.profile_image = optimizedBase64; // Salva direttamente come Base64
+      imageInfo.value = `Immagine salvata (Base64).`;
     }
   } catch (error) {
-    console.error("Errore processamento immagine:", error);
-    errorMessage.value = `Errore nell'elaborazione dell'immagine: ${error.message}`;
-    imagePreview.value = profileData.value.profile_image || ""; // Ripristina anteprima precedente se c'è errore
+    errorMessage.value = error.message;
+    console.error("Errore caricamento immagine:", error);
   } finally {
     loading.value = false;
-    // Pulisci l'input file per permettere di ricaricare lo stesso file
-    event.target.value = null;
+    event.target.value = null; // Resetta input file
   }
-};
-
-const processAndOptimizeImage = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          let { width, height } = img;
-          if (width > maxImageDimension || height > maxImageDimension) {
-            if (width > height) {
-              height *= maxImageDimension / width;
-              width = maxImageDimension;
-            } else {
-              width *= maxImageDimension / height;
-              height = maxImageDimension;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-          const optimizedBase64 = canvas.toDataURL("image/jpeg", imageQuality); // Usa JPEG per compressione
-          resolve(optimizedBase64);
-        } catch (err) {
-          reject(new Error("Errore ottimizzazione immagine"));
-        }
-      };
-      img.onerror = () => reject(new Error("Impossibile caricare l'immagine"));
-      img.src = e.target.result;
-    };
-    reader.onerror = () => reject(new Error("Errore lettura file"));
-    reader.readAsDataURL(file);
-  });
 };
 
 // Funzione per rimuovere l'immagine (sia da Storage che da Base64)
@@ -909,73 +840,41 @@ const uploadImageToStorage = async (file) => {
   const fileName = `${Date.now()}_${Math.random()
     .toString(36)
     .substring(2, 8)}.${fileExt}`;
-  // Crea un path specifico per l'utente dentro la cartella 'profiles'
   const filePath = `${storageConfig.storagePath}/${user.value.id}/${fileName}`;
 
   console.log(`Upload su: ${storageConfig.bucketName}/${filePath}`);
 
-  // Ottimizza l'immagine prima dell'upload per ridurre dimensioni
-  const blobToUpload = await processAndOptimizeImageBlob(file); // Modifica qui per ottenere un Blob
+  const blobToUpload = await processAndOptimizeImage(file, true); // Ottieni un Blob ottimizzato
 
-  let attempt = 0;
-  while (attempt <= storageConfig.maxRetries) {
-    try {
-      const { data, error } = await supabase.storage
-        .from(storageConfig.bucketName)
-        .upload(filePath, blobToUpload, {
-          // Usa il Blob ottimizzato
-          cacheControl: "3600", // Cache per 1 ora
-          upsert: false, // Non sovrascrivere se esiste (genera nuovo nome)
-          contentType: blobToUpload.type, // Specifica il content type corretto
-        });
+  try {
+    const { data, error } = await supabase.storage
+      .from(storageConfig.bucketName)
+      .upload(filePath, blobToUpload, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: blobToUpload.type,
+      });
 
-      if (error) throw error; // Lancia l'errore per il blocco catch
+    if (error) throw error;
 
-      // Ottieni l'URL pubblico dopo l'upload
-      const { data: urlData } = supabase.storage
-        .from(storageConfig.bucketName)
-        .getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage
+      .from(storageConfig.bucketName)
+      .getPublicUrl(filePath);
 
-      if (!urlData?.publicUrl) {
-        // Se l'URL non è disponibile subito (raro), riprova dopo un breve ritardo
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const { data: retryUrlData } = supabase.storage
-          .from(storageConfig.bucketName)
-          .getPublicUrl(filePath);
-        if (!retryUrlData?.publicUrl)
-          throw new Error("URL pubblico non generato dopo upload");
-        console.log(
-          "Upload riuscito (URL ottenuto al secondo tentativo):",
-          retryUrlData.publicUrl
-        );
-        return retryUrlData.publicUrl;
-      }
-
-      console.log("Upload riuscito:", urlData.publicUrl);
-      return urlData.publicUrl; // Ritorna l'URL pubblico
-    } catch (error) {
-      attempt++;
-      console.error(
-        `Upload fallito (tentativo ${attempt}/${
-          storageConfig.maxRetries + 1
-        }):`,
-        error.message || error
-      );
-      if (attempt > storageConfig.maxRetries) {
-        // Se tutti i tentativi falliscono, lancia l'errore finale
-        throw new Error(
-          `Upload immagine fallito dopo ${attempt} tentativi: ${error.message}`
-        );
-      }
-      // Aspetta un po' prima di riprovare (backoff esponenziale potrebbe essere meglio)
-      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    if (!urlData?.publicUrl) {
+      throw new Error("URL pubblico non generato dopo upload");
     }
+
+    console.log("Upload riuscito:", urlData.publicUrl);
+    return urlData.publicUrl; // Ritorna l'URL pubblico
+  } catch (error) {
+    console.error("Errore durante l'upload:", error);
+    throw error;
   }
-  throw new Error("Upload fallito dopo tutti i tentativi."); // In caso il loop finisca senza successo
 };
 
 // Funzione helper per ottimizzare e restituire un Blob invece di Base64
-const processAndOptimizeImageBlob = (file) => {
+const processAndOptimizeImage = (file, returnBlob = false) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -984,7 +883,6 @@ const processAndOptimizeImageBlob = (file) => {
         try {
           let { width, height } = img;
           if (width > maxImageDimension || height > maxImageDimension) {
-            // Logica di resize... (uguale a processAndOptimizeImage)
             if (width > height) {
               height *= maxImageDimension / width;
               width = maxImageDimension;
@@ -998,31 +896,34 @@ const processAndOptimizeImageBlob = (file) => {
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
-          // Converte in Blob invece che Base64
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error("Creazione Blob fallita"));
-              }
-            },
-            "image/jpeg", // Specifica il formato desiderato
-            imageQuality // Applica la qualità
-          );
+
+          if (returnBlob) {
+            canvas.toBlob(
+              (blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("Creazione Blob fallita"));
+              },
+              "image/jpeg",
+              imageQuality
+            );
+          } else {
+            const optimizedBase64 = canvas.toDataURL(
+              "image/jpeg",
+              imageQuality
+            );
+            resolve(optimizedBase64);
+          }
         } catch (err) {
-          reject(new Error("Errore ottimizzazione immagine per Blob"));
+          reject(new Error("Errore ottimizzazione immagine"));
         }
       };
-      img.onerror = () =>
-        reject(new Error("Impossibile caricare immagine per Blob"));
+      img.onerror = () => reject(new Error("Impossibile caricare immagine"));
       img.src = e.target.result;
     };
-    reader.onerror = () => reject(new Error("Errore lettura file per Blob"));
+    reader.onerror = () => reject(new Error("Errore lettura file"));
     reader.readAsDataURL(file);
   });
 };
-
 // --- Addresses ---
 
 const fetchAddresses = async () => {
@@ -1038,12 +939,26 @@ const fetchAddresses = async () => {
 };
 
 const saveAddress = async () => {
-  if (!user.value?.id) return;
-  try {
-    // Clona l'oggetto per evitare modifiche dirette e assicurati che user_id sia presente
-    const addressData = { ...newAddress.value, user_id: user.value.id };
-    let operation;
+  if (!user.value?.id) {
+    errorMessage.value =
+      "Utente non autenticato. Effettua il login per salvare un indirizzo.";
+    return;
+  }
 
+  // Validazione dei campi obbligatori
+  if (!validateAddress()) {
+    return; // La funzione `validateAddress` mostrerà un messaggio di errore
+  }
+
+  try {
+    loading.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+
+    // Clona l'oggetto per evitare modifiche dirette e aggiungi `user_id`
+    const addressData = { ...newAddress.value, user_id: user.value.id };
+
+    let operation;
     if (addressData.id) {
       // Aggiorna indirizzo esistente
       operation = supabase
@@ -1052,27 +967,30 @@ const saveAddress = async () => {
         .eq("id", addressData.id)
         .select(); // Seleziona per confermare l'aggiornamento
     } else {
-      // Crea nuovo indirizzo (rimuovi id temporaneo se presente)
-      delete addressData.id;
+      // Crea nuovo indirizzo
+      delete addressData.id; // Rimuovi l'ID temporaneo se presente
       operation = supabase.from("addresses").insert(addressData).select();
     }
 
-    const { error } = await operation; // Solo l'errore ci interessa qui
+    const { error } = await operation;
     if (error) throw error;
 
-    await fetchAddresses(); // Ricarica la lista aggiornata
-    resetAddressForm(); // Nascondi e pulisci il form
+    // Aggiorna la lista degli indirizzi
+    await fetchAddresses();
+
+    // Resetta il form e mostra un messaggio di successo
+    resetAddressForm();
     successMessage.value = addressData.id
-      ? "Indirizzo aggiornato!"
-      : "Nuovo indirizzo salvato!";
+      ? "Indirizzo aggiornato con successo!"
+      : "Nuovo indirizzo salvato con successo!";
     setTimeout(() => {
       successMessage.value = "";
     }, 3000);
   } catch (error) {
-    errorMessage.value = `Errore salvataggio indirizzo: ${
-      error.message || error
-    }`;
+    errorMessage.value = `Errore durante il salvataggio dell'indirizzo: ${error.message}`;
     console.error("Error saving address:", error);
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -1122,7 +1040,7 @@ const resetAddressForm = () => {
     country: "",
     id: null,
   };
-  showAddressForm.value = false;
+  showAddressForm.value = false; // Nascondi il form
 };
 
 const cancelAddressForm = () => {
@@ -1368,6 +1286,20 @@ const addToCart = (productId) => {
 // --- Navigation ---
 const goToLogin = () => {
   router.push("/login");
+};
+
+const validateAddress = () => {
+  if (
+    !newAddress.value.name ||
+    !newAddress.value.street ||
+    !newAddress.value.city ||
+    !newAddress.value.zip_code ||
+    !newAddress.value.country
+  ) {
+    errorMessage.value = "Tutti i campi obbligatori devono essere compilati.";
+    return false;
+  }
+  return true;
 };
 </script>
 
@@ -1884,27 +1816,23 @@ textarea {
   padding: 10px;
 }
 
-.image-upload {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem; /* Maggiore spazio */
-  flex: 1; /* Occupa spazio disponibile */
-  min-width: 200px; /* Larghezza minima */
+.image-upload input[type="file"] {
+  display: none;
 }
+
 .image-upload label {
-  /* Stile per il label dell'input file */
-  font-weight: 500;
   cursor: pointer;
   color: #4361ee;
   text-decoration: underline;
 }
-.image-upload input[type="file"] {
-  /* Nascondi l'input file di default (opzionale, puoi stilizzarlo) */
-  border: none;
-  padding: 0;
-  /* background-color: #f0f0f0;
-     padding: 0.5rem;
-     border-radius: 4px; */
+
+.image-upload input[type="file"] + label {
+  display: inline-block;
+  background-color: #f0f0f0;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .remove-image-btn {
@@ -2002,5 +1930,18 @@ textarea {
   border-radius: 4px;
   object-fit: cover;
   border: 1px solid #eee;
+}
+.logout-btn {
+  background-color: #d32f2f;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.logout-btn:hover {
+  background-color: #b71c1c;
 }
 </style>
