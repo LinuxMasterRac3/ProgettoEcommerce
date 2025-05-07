@@ -1,8 +1,6 @@
 <template>
   <div class="page-wrapper">
-    <!-- Aggiunto wrapper se necessario per layout complessivo -->
     <Navbar />
-    <!-- NAVBAR AGGIUNTA QUI -->
 
     <div
       class="account-container"
@@ -12,12 +10,6 @@
         v-if="loading"
         class="loading">
         Caricamento informazioni dell'account...
-      </div>
-
-      <div
-        v-if="errorMessage"
-        class="error-message">
-        {{ errorMessage }}
       </div>
 
       <div
@@ -46,14 +38,12 @@
                 </div>
               </div>
               <div class="image-upload">
-                <!-- Mostra il testo solo se non c'è un'immagine caricata -->
                 <label
                   v-if="!profileData.profile_image"
                   for="profileImage"
                   >Carica immagine profilo</label
                 >
 
-                <!-- Cambia il testo del pulsante in base alla presenza dell'immagine -->
                 <input
                   id="profileImage"
                   type="file"
@@ -66,11 +56,6 @@
                   class="remove-image-btn">
                   Rimuovi immagine
                 </button>
-                <p
-                  v-if="imageInfo"
-                  class="image-info">
-                  {{ imageInfo }}
-                </p>
               </div>
               <button
                 @click="logout"
@@ -412,34 +397,11 @@
             </div>
           </div>
         </div>
-
-        <!-- Storage settings debug (solo per sviluppo) -->
-        <div
-          class="debug-container"
-          v-if="isDevelopment">
-          <div class="storage-info">
-            <small
-              ><strong>Stato Storage:</strong>
-              {{
-                useStorageBucket ? "Bucket Storage" : "Base64 Fallback"
-              }}</small
-            >
-            <small v-if="useStorageBucket"
-              >Bucket: {{ storageConfig.bucketName }}</small
-            >
-            <small
-              >Dimensione massima immagine:
-              {{ (maxImageSize / 1024 / 1024).toFixed(1) }}MB</small
-            >
-          </div>
-        </div>
       </div>
     </div>
     <div
       v-else
       class="account-container">
-      <!-- Aggiungi Navbar anche qui se vuoi mostrarla quando l'utente non è loggato -->
-      <!-- <Navbar /> -->
       <h1>Accedi per visualizzare il tuo account</h1>
       <button
         @click="goToLogin"
@@ -451,16 +413,14 @@
       Se non hai un account, puoi registrarti
       <router-link to="/register">qui</router-link>.
     </div>
-    <!-- Aggiungi Footer se necessario -->
-    <!-- <Footer /> -->
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
-import Navbar from "../components/Navbar.vue"; // <-- IMPORTA NAVBAR
+import Navbar from "../components/Navbar.vue";
 
 // Supabase configuration
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
@@ -468,29 +428,16 @@ const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpeWxmeXlmaXRxendzdGZ0enBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNjYyNDcsImV4cCI6MjA1Njc0MjI0N30.CvIx_vI-KGGcFlcZy66-DIC8Itk03Olw3lzEMhnJP_c";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Storage configuration
-const storageConfig = {
-  bucketName: "images",
-  maxRetries: 2,
-  storagePath: "profiles", // Path within the bucket
-};
-
-// Environment check
-const isDevelopment = process.env.NODE_ENV === "development";
-
-const router = useRouter();
-const user = ref(null);
-const loading = ref(true);
-const errorMessage = ref("");
-const successMessage = ref("");
-const imageInfo = ref("");
-const imagePreview = ref(""); // Per mostrare l'anteprima
-const useStorageBucket = ref(false); // Flag per indicare se usare il bucket o base64, default false finché non verificato
-
 // Configurazione per la gestione delle immagini
 const maxImageSize = 1 * 1024 * 1024; // 1MB
 const maxImageDimension = 1200; // Dimensione max per larghezza/altezza
 const imageQuality = 0.7; // Qualità compressione JPEG
+
+const router = useRouter();
+const user = ref(null);
+const loading = ref(true);
+const successMessage = ref("");
+const imagePreview = ref("");
 
 // Profile data
 const profileData = ref({
@@ -498,7 +445,7 @@ const profileData = ref({
   last_name: "",
   phone: "",
   description: "",
-  profile_image: "", // Può essere URL o Base64
+  profile_image: "",
 });
 
 // Addresses
@@ -511,7 +458,7 @@ const newAddress = ref({
   city: "",
   zip_code: "",
   country: "",
-  id: null, // Used when editing an existing address
+  id: null,
 });
 
 // Orders
@@ -527,42 +474,42 @@ const reviews = ref([]);
 // --- Lifecycle & Fetching ---
 
 onMounted(async () => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  if (!session?.user) {
+    if (!session?.user) {
+      loading.value = false;
+      return;
+    }
+
+    user.value = session.user;
+    await fetchUserData();
+  } catch (error) {
+    console.error("Errore durante l'inizializzazione:", error);
+  } finally {
     loading.value = false;
-    // Non reindirizzare automaticamente, mostra il messaggio "Accedi..."
-    // router.push('/login');
-    return;
   }
-
-  user.value = session.user;
-
-  await checkBucketExists(); // Verifica *prima* di caricare i dati
-  await fetchUserData();
 });
 
 const logout = async () => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await supabase.auth.signOut();
     user.value = null;
     router.push("/login");
   } catch (err) {
-    errorMessage.value = "Errore durante il logout. Riprova più tardi.";
     console.error("Errore durante il logout:", err.message);
   }
 };
 
 const fetchUserData = async () => {
   loading.value = true;
-  errorMessage.value = "";
   successMessage.value = "";
 
   try {
-    await Promise.all([
+    // Esegui le query in parallelo per migliorare le prestazioni
+    await Promise.allSettled([
       fetchProfile(),
       fetchAddresses(),
       fetchOrders(),
@@ -570,7 +517,6 @@ const fetchUserData = async () => {
       fetchReviews(),
     ]);
   } catch (error) {
-    errorMessage.value = `Errore nel caricamento dei dati dell'account: ${error.message}`;
     console.error("Error fetching user data:", error);
   } finally {
     loading.value = false;
@@ -582,41 +528,37 @@ const fetchUserData = async () => {
 const fetchProfile = async () => {
   if (!user.value?.id) return;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.value.id)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.value.id)
+      .single();
 
-  if (error && error.code !== "PGRST116") {
-    // Ignora l'errore se il profilo non esiste ancora
-    throw new Error(`Errore fetch profilo: ${error.message}`);
-  }
-
-  if (data) {
-    profileData.value = { ...profileData.value, ...data }; // Merge per mantenere la struttura
-    // Imposta l'anteprima solo se l'immagine esiste
-    if (data.profile_image) {
-      imagePreview.value = data.profile_image;
-      // Aggiungi info su dove è salvata l'immagine
-      imageInfo.value = useStorageBucket.value
-        ? `Immagine su: ${storageConfig.bucketName}`
-        : "Immagine salvata (Base64)";
-    } else {
-      imagePreview.value = ""; // Assicurati che l'anteprima sia vuota se non c'è immagine
-      imageInfo.value = "";
+    if (error && error.code !== "PGRST116") {
+      throw error;
     }
-  } else {
-    // Se non ci sono dati (profilo non esiste), resetta i campi
-    profileData.value = {
-      first_name: "",
-      last_name: "",
-      phone: "",
-      description: "",
-      profile_image: "",
-    };
-    imagePreview.value = "";
-    imageInfo.value = "";
+
+    if (data) {
+      profileData.value = { ...profileData.value, ...data };
+
+      if (data.profile_image) {
+        imagePreview.value = data.profile_image;
+      } else {
+        imagePreview.value = "";
+      }
+    } else {
+      profileData.value = {
+        first_name: "",
+        last_name: "",
+        phone: "",
+        description: "",
+        profile_image: "",
+      };
+      imagePreview.value = "";
+    }
+  } catch (error) {
+    console.error("Errore caricamento profilo:", error);
   }
 };
 
@@ -624,7 +566,6 @@ const updateProfile = async () => {
   if (!user.value?.id) return;
 
   loading.value = true;
-  errorMessage.value = "";
   successMessage.value = "";
 
   try {
@@ -635,23 +576,22 @@ const updateProfile = async () => {
       last_name: profileData.value.last_name || null,
       phone: profileData.value.phone || null,
       description: profileData.value.description || null,
-      profile_image: profileData.value.profile_image || null, // Salva l'immagine
+      profile_image: profileData.value.profile_image || null,
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("profiles")
-      .upsert(profileUpdates, { onConflict: "id" })
-      .select()
-      .single();
+      .upsert(profileUpdates, { onConflict: "id" });
 
     if (error) throw error;
 
-    profileData.value = { ...profileData.value, ...data };
     successMessage.value = "Profilo aggiornato con successo!";
+    setTimeout(() => {
+      successMessage.value = "";
+    }, 3000);
   } catch (error) {
     console.error("Errore aggiornamento profilo:", error);
-    errorMessage.value = `Errore aggiornamento profilo: ${error.message}`;
   } finally {
     loading.value = false;
   }
@@ -661,47 +601,25 @@ const handleImageUpload = async (event) => {
   const file = event.target.files[0];
   if (!file) return;
 
-  imageInfo.value = "";
-  errorMessage.value = "";
-  successMessage.value = "";
   loading.value = true;
+  successMessage.value = "";
 
   try {
     // Validazione
     if (!file.type.startsWith("image/")) {
-      throw new Error("Seleziona un file immagine valido.");
+      console.error("Formato immagine non valido");
+      return;
     }
     if (file.size > maxImageSize) {
-      throw new Error(
-        `Immagine troppo grande (max ${(maxImageSize / 1024 / 1024).toFixed(
-          1
-        )}MB).`
-      );
+      console.error("Immagine troppo grande");
+      return;
     }
 
     // Ottimizza immagine
     const optimizedBase64 = await processAndOptimizeImage(file);
     imagePreview.value = optimizedBase64;
-
-    if (useStorageBucket.value) {
-      try {
-        const imageUrl = await uploadImageToStorage(file);
-        profileData.value.profile_image = imageUrl; // Salva l'URL nel profilo
-        imageInfo.value = `Immagine caricata su: ${storageConfig.bucketName}`;
-      } catch (storageError) {
-        console.warn(
-          "Errore upload su Storage, fallback a Base64:",
-          storageError
-        );
-        profileData.value.profile_image = optimizedBase64; // Fallback a Base64
-        imageInfo.value = `Caricamento Storage fallito. Salvataggio come Base64.`;
-      }
-    } else {
-      profileData.value.profile_image = optimizedBase64; // Salva direttamente come Base64
-      imageInfo.value = `Immagine salvata (Base64).`;
-    }
+    profileData.value.profile_image = optimizedBase64;
   } catch (error) {
-    errorMessage.value = error.message;
     console.error("Errore caricamento immagine:", error);
   } finally {
     loading.value = false;
@@ -709,171 +627,24 @@ const handleImageUpload = async (event) => {
   }
 };
 
-// Funzione per rimuovere l'immagine (sia da Storage che da Base64)
 const removeProfileImage = async () => {
   const currentImage = profileData.value.profile_image;
-  if (!currentImage) return; // Nessuna immagine da rimuovere
+  if (!currentImage) return;
 
   loading.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
 
-  // Se l'immagine è un URL dello storage, prova a rimuoverla dal bucket
-  if (useStorageBucket.value && currentImage.includes(supabaseUrl)) {
-    try {
-      // Estrai il path corretto dall'URL pubblico
-      const pathStartIndex =
-        currentImage.indexOf(storageConfig.bucketName + "/") +
-        storageConfig.bucketName.length +
-        1;
-      const imagePath = currentImage.substring(pathStartIndex);
-
-      if (imagePath) {
-        console.log(
-          `Tentativo rimozione da Storage: ${storageConfig.bucketName}/${imagePath}`
-        );
-        const { error } = await supabase.storage
-          .from(storageConfig.bucketName)
-          .remove([imagePath]); // Passa il path come array
-
-        if (error) {
-          console.error("Errore rimozione da Storage:", error);
-          // Non bloccare l'utente, ma segnala l'errore
-          errorMessage.value =
-            "Errore nella rimozione dell'immagine dallo storage.";
-        } else {
-          console.log("Immagine rimossa dallo storage.");
-        }
-      } else {
-        console.warn("Impossibile estrarre il path dall'URL:", currentImage);
-      }
-    } catch (err) {
-      console.error("Errore generico rimozione Storage:", err);
-      errorMessage.value = "Errore imprevisto nella rimozione dallo storage.";
-    }
-  }
-
-  // In ogni caso, rimuovi l'immagine dai dati del profilo e dall'anteprima
+  // Rimuovi solo l'immagine dai dati del profilo e dall'anteprima
   profileData.value.profile_image = null;
   imagePreview.value = "";
-  imageInfo.value = "";
-
-  // Potresti voler salvare subito il profilo senza immagine, o lasciare che l'utente clicchi "Aggiorna Profilo"
-  // await updateProfile(); //-> Rimuovi commento per salvare subito
 
   loading.value = false;
-  if (!errorMessage.value) {
-    successMessage.value = "Immagine rimossa.";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
-  }
+  successMessage.value = "Immagine rimossa.";
+  setTimeout(() => {
+    successMessage.value = "";
+  }, 3000);
 };
 
-// --- Storage Handling ---
-
-const checkBucketExists = async () => {
-  try {
-    // Chiedi la lista dei bucket disponibili
-    const { data: buckets, error: listError } =
-      await supabase.storage.listBuckets();
-
-    if (listError) {
-      // Se c'è un errore nel listare i bucket (es. permessi mancanti per l'utente anonimo)
-      console.warn(
-        "Impossibile verificare i bucket (potrebbe mancare policy RLS per list):",
-        listError.message
-      );
-      // In questo caso, assumiamo che lo storage non sia utilizzabile e usiamo Base64
-      useStorageBucket.value = false;
-      return false;
-    }
-
-    // Controlla se il bucket desiderato è nella lista
-    const bucketExists = buckets.some(
-      (b) => b.name === storageConfig.bucketName
-    );
-
-    if (bucketExists) {
-      // Tentativo di ottenere dettagli del bucket per verificare i permessi di lettura/scrittura
-      // NOTA: getBucket() potrebbe richiedere permessi specifici che l'utente anonimo potrebbe non avere.
-      // Se fallisce, potremmo comunque provare a usare lo storage e gestire errori specifici durante l'upload/download.
-      try {
-        const { data: bucketDetails, error: detailsError } =
-          await supabase.storage.getBucket(storageConfig.bucketName);
-        if (detailsError) {
-          console.warn(
-            `Bucket ${storageConfig.bucketName} trovato, ma impossibile ottenere dettagli (verifica policy RLS):`,
-            detailsError.message
-          );
-          // Potremmo decidere di usare comunque lo storage e vedere se l'upload fallisce,
-          // oppure fare fallback a Base64 per sicurezza. Scegliamo il fallback per ora.
-          useStorageBucket.value = false;
-        } else {
-          console.log(
-            `Bucket ${storageConfig.bucketName} trovato e accessibile.`
-          );
-          useStorageBucket.value = true; // Bucket esiste e sembra accessibile
-        }
-      } catch (getBucketError) {
-        console.error("Errore imprevisto getBucket:", getBucketError);
-        useStorageBucket.value = false; // Fallback per sicurezza
-      }
-    } else {
-      console.warn(
-        `Bucket '${storageConfig.bucketName}' non trovato. Fallback a Base64.`
-      );
-      useStorageBucket.value = false; // Bucket non esiste
-    }
-  } catch (error) {
-    console.error("Errore imprevisto durante verifica bucket:", error);
-    useStorageBucket.value = false; // Fallback in caso di errore generico
-  }
-  console.log(`Utilizzo Storage Bucket: ${useStorageBucket.value}`);
-  return useStorageBucket.value;
-};
-
-const uploadImageToStorage = async (file) => {
-  if (!user.value?.id) throw new Error("Utente non autenticato per upload");
-
-  const fileExt = file.name.split(".").pop();
-  const fileName = `${Date.now()}_${Math.random()
-    .toString(36)
-    .substring(2, 8)}.${fileExt}`;
-  const filePath = `${storageConfig.storagePath}/${user.value.id}/${fileName}`;
-
-  console.log(`Upload su: ${storageConfig.bucketName}/${filePath}`);
-
-  const blobToUpload = await processAndOptimizeImage(file, true); // Ottieni un Blob ottimizzato
-
-  try {
-    const { data, error } = await supabase.storage
-      .from(storageConfig.bucketName)
-      .upload(filePath, blobToUpload, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: blobToUpload.type,
-      });
-
-    if (error) throw error;
-
-    const { data: urlData } = supabase.storage
-      .from(storageConfig.bucketName)
-      .getPublicUrl(filePath);
-
-    if (!urlData?.publicUrl) {
-      throw new Error("URL pubblico non generato dopo upload");
-    }
-
-    console.log("Upload riuscito:", urlData.publicUrl);
-    return urlData.publicUrl; // Ritorna l'URL pubblico
-  } catch (error) {
-    console.error("Errore durante l'upload:", error);
-    throw error;
-  }
-};
-
-// Funzione helper per ottimizzare e restituire un Blob invece di Base64
+// Funzione helper per ottimizzare l'immagine
 const processAndOptimizeImage = (file, returnBlob = false) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -924,51 +695,50 @@ const processAndOptimizeImage = (file, returnBlob = false) => {
     reader.readAsDataURL(file);
   });
 };
+
 // --- Addresses ---
 
 const fetchAddresses = async () => {
   if (!user.value?.id) return;
-  const { data, error } = await supabase
-    .from("addresses")
-    .select("*")
-    .eq("user_id", user.value.id)
-    .order("created_at", { ascending: false });
 
-  if (error) throw new Error(`Errore fetch indirizzi: ${error.message}`);
-  addresses.value = data || [];
+  try {
+    const { data, error } = await supabase
+      .from("addresses")
+      .select("*")
+      .eq("user_id", user.value.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    addresses.value = data || [];
+  } catch (error) {
+    console.error("Errore caricamento indirizzi:", error);
+    addresses.value = [];
+  }
 };
 
 const saveAddress = async () => {
-  if (!user.value?.id) {
-    errorMessage.value =
-      "Utente non autenticato. Effettua il login per salvare un indirizzo.";
-    return;
-  }
+  if (!user.value?.id) return;
 
   // Validazione dei campi obbligatori
   if (!validateAddress()) {
-    return; // La funzione `validateAddress` mostrerà un messaggio di errore
+    return;
   }
 
   try {
     loading.value = true;
-    errorMessage.value = "";
-    successMessage.value = "";
 
     // Clona l'oggetto per evitare modifiche dirette e aggiungi `user_id`
     const addressData = { ...newAddress.value, user_id: user.value.id };
 
     let operation;
     if (addressData.id) {
-      // Aggiorna indirizzo esistente
       operation = supabase
         .from("addresses")
         .update(addressData)
         .eq("id", addressData.id)
-        .select(); // Seleziona per confermare l'aggiornamento
+        .select();
     } else {
-      // Crea nuovo indirizzo
-      delete addressData.id; // Rimuovi l'ID temporaneo se presente
+      delete addressData.id;
       operation = supabase.from("addresses").insert(addressData).select();
     }
 
@@ -987,7 +757,6 @@ const saveAddress = async () => {
       successMessage.value = "";
     }, 3000);
   } catch (error) {
-    errorMessage.value = `Errore durante il salvataggio dell'indirizzo: ${error.message}`;
     console.error("Error saving address:", error);
   } finally {
     loading.value = false;
@@ -995,10 +764,8 @@ const saveAddress = async () => {
 };
 
 const editAddress = (index) => {
-  // Copia i dati dell'indirizzo nel form per la modifica
   newAddress.value = { ...addresses.value[index] };
-  showAddressForm.value = true; // Mostra il form
-  // Scrolla verso il form se necessario
+  showAddressForm.value = true;
   document
     .querySelector(".address-form")
     ?.scrollIntoView({ behavior: "smooth" });
@@ -1013,19 +780,16 @@ const deleteAddress = async (addressId) => {
       .from("addresses")
       .delete()
       .eq("id", addressId)
-      .eq("user_id", user.value.id); // Sicurezza: elimina solo indirizzi dell'utente
+      .eq("user_id", user.value.id);
 
     if (error) throw error;
 
-    await fetchAddresses(); // Aggiorna la lista
+    await fetchAddresses();
     successMessage.value = "Indirizzo eliminato.";
     setTimeout(() => {
       successMessage.value = "";
     }, 3000);
   } catch (error) {
-    errorMessage.value = `Errore eliminazione indirizzo: ${
-      error.message || error
-    }`;
     console.error("Error deleting address:", error);
   }
 };
@@ -1040,7 +804,7 @@ const resetAddressForm = () => {
     country: "",
     id: null,
   };
-  showAddressForm.value = false; // Nascondi il form
+  showAddressForm.value = false;
 };
 
 const cancelAddressForm = () => {
@@ -1051,194 +815,204 @@ const cancelAddressForm = () => {
 
 const fetchOrders = async () => {
   if (!user.value?.id) return;
-  // Seleziona ordini e relativi item in una sola chiamata con JOIN implicito di Supabase
-  const { data, error } = await supabase
-    .from("orders")
-    .select(
-      `
-      id,
-      created_at,
-      status,
-      total_amount,
-      items:order_items ( id, product_name, quantity, unit_price )
-    `
-    )
-    .eq("user_id", user.value.id)
-    .order("created_at", { ascending: false });
 
-  if (error) throw new Error(`Errore fetch ordini: ${error.message}`);
-
-  orders.value = data || [];
-};
-
-const toggleOrderDetails = (orderId) => {
-  const index = expandedOrders.value.indexOf(orderId);
-  if (index > -1) {
-    expandedOrders.value.splice(index, 1); // Rimuovi se già presente
-  } else {
-    expandedOrders.value.push(orderId); // Aggiungi se non presente
-  }
-};
-
-// --- Favorites ---
-
-const fetchFavorites = async () => {
-  if (!user.value?.id) return;
-  // Seleziona preferiti e relativi prodotti con maggiori dettagli
-  const { data, error } = await supabase
-    .from("favorites")
-    .select(
-      `
-      id,
-      product_id,
-      created_at,
-      product:products ( 
-        id, 
-        name, 
-        price, 
-        description,
-        discount_percentage, 
-        rating,
-        review_count,
-        metadata,
-        created_at,
-        user_id
-      )
-    `
-    )
-    .eq("user_id", user.value.id);
-
-  if (error) {
-    console.error("Errore durante il recupero dei preferiti:", error);
-    throw new Error(`Errore fetch preferiti: ${error.message}`);
-  }
-
-  // Filtra eventuali preferiti il cui prodotto associato non esiste più
-  // e formatta i dati per la visualizzazione
-  favorites.value = (data || [])
-    .filter((fav) => fav.product)
-    .map((fav) => {
-      // Estrai l'URL immagine dal metadata o usa un placeholder
-      let imageUrl = "https://placehold.co/300x400?text=No+Image";
-      if (
-        fav.product.metadata?.additional_images &&
-        fav.product.metadata.additional_images.length > 0
-      ) {
-        imageUrl = fav.product.metadata.additional_images[0];
-      }
-
-      return {
-        ...fav,
-        product: {
-          ...fav.product,
-          image_url: imageUrl, // Aggiungi l'URL dell'immagine
-          // Assicurati che il prezzo sia un numero per il .toFixed()
-          price:
-            typeof fav.product.price === "string"
-              ? parseFloat(fav.product.price)
-              : fav.product.price,
-        },
-      };
-    });
-};
-
-const removeFavorite = async (favoriteId) => {
-  if (!user.value?.id) return;
   try {
-    const { error } = await supabase
-      .from("favorites")
-      .delete()
-      .eq("id", favoriteId)
-      .eq("user_id", user.value.id); // Sicurezza
-
-    if (error) throw error;
-
-    await fetchFavorites(); // Aggiorna la lista
-    successMessage.value = "Rimosso dai preferiti.";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
-  } catch (error) {
-    errorMessage.value = `Errore rimozione preferito: ${
-      error.message || error
-    }`;
-    console.error("Error removing favorite:", error);
-  }
-};
-
-// --- Reviews ---
-
-const fetchReviews = async () => {
-  if (!user.value?.id) return;
-  try {
-    // Ottieni recensioni con dati completi del prodotto associato
     const { data, error } = await supabase
-      .from("reviews")
+      .from("orders")
       .select(
         `
         id,
-        rating,
-        comment,
         created_at,
-        product_id,
-        product:products ( 
-          id, 
-          name, 
-          price, 
-          description,
-          discount_percentage,
-          rating,
-          review_count,
-          metadata,
-          created_at
-        )
+        status,
+        total_amount,
+        items:order_items ( id, product_name, quantity, unit_price )
       `
       )
       .eq("user_id", user.value.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Errore durante il recupero delle recensioni:", error);
-      throw error;
+    if (error) throw error;
+    orders.value = data || [];
+  } catch (error) {
+    console.error("Errore caricamento ordini:", error);
+    orders.value = [];
+  }
+};
+
+const toggleOrderDetails = (orderId) => {
+  const index = expandedOrders.value.indexOf(orderId);
+  if (index > -1) {
+    expandedOrders.value.splice(index, 1);
+  } else {
+    expandedOrders.value.push(orderId);
+  }
+};
+
+// --- Favorites --- (Versione corretta senza relazione)
+const fetchFavorites = async () => {
+  if (!user.value?.id) return;
+
+  try {
+    // Step 1: Recupera prima i preferiti dell'utente
+    const { data: favoritesData, error: favoritesError } = await supabase
+      .from("favorites")
+      .select("id, product_id, created_at")
+      .eq("user_id", user.value.id);
+
+    if (favoritesError) throw favoritesError;
+
+    if (!favoritesData || favoritesData.length === 0) {
+      favorites.value = [];
+      return;
     }
 
-    // Filtra recensioni senza prodotto valido e formatta i dati
-    reviews.value = (data || [])
-      .filter((rev) => rev.product)
-      .map((rev) => {
+    // Step 2: Ottieni i dettagli dei prodotti associati ai preferiti
+    const productIds = favoritesData.map((fav) => fav.product_id);
+
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select(
+        "id, name, price, description, discount_percentage, rating, review_count, metadata"
+      )
+      .in("id", productIds);
+
+    if (productsError) throw productsError;
+
+    // Step 3: Combina i dati dei preferiti con i prodotti corrispondenti
+    const processed = favoritesData
+      .map((favorite) => {
+        const product = productsData.find((p) => p.id === favorite.product_id);
+
+        if (!product) return null;
+
         // Estrai l'URL immagine dal metadata o usa un placeholder
         let imageUrl = "https://placehold.co/300x400?text=No+Image";
         if (
-          rev.product.metadata?.additional_images &&
-          rev.product.metadata.additional_images.length > 0
+          product.metadata?.additional_images &&
+          product.metadata.additional_images.length > 0
         ) {
-          imageUrl = rev.product.metadata.additional_images[0];
+          imageUrl = product.metadata.additional_images[0];
         }
 
         return {
-          ...rev,
+          id: favorite.id,
+          product_id: favorite.product_id,
+          created_at: favorite.created_at,
           product: {
-            ...rev.product,
-            image_url: imageUrl, // Aggiungi l'URL dell'immagine
-            // Formatta il prezzo per visualizzazione
+            ...product,
+            image_url: imageUrl,
             price:
-              typeof rev.product.price === "string"
-                ? parseFloat(rev.product.price)
-                : rev.product.price,
+              typeof product.price === "string"
+                ? parseFloat(product.price)
+                : product.price,
           },
         };
-      });
+      })
+      .filter((item) => item !== null);
+
+    favorites.value = processed;
   } catch (error) {
-    console.error("Errore fetch recensioni:", error);
-    errorMessage.value = `Errore nel caricamento delle recensioni: ${error.message}`;
-    reviews.value = []; // Resetta in caso di errore
+    console.error("Errore caricamento preferiti:", error);
+    favorites.value = [];
+  }
+};
+
+const removeFavorite = async (favoriteId) => {
+  if (!user.value?.id) return;
+
+  try {
+    const { error } = await supabase
+      .from("favorites")
+      .delete()
+      .eq("id", favoriteId)
+      .eq("user_id", user.value.id);
+
+    if (error) throw error;
+
+    await fetchFavorites();
+    successMessage.value = "Rimosso dai preferiti.";
+    setTimeout(() => {
+      successMessage.value = "";
+    }, 3000);
+  } catch (error) {
+    console.error("Error removing favorite:", error);
+  }
+};
+
+// --- Reviews --- (Versione corretta senza relazione)
+const fetchReviews = async () => {
+  if (!user.value?.id) return;
+
+  try {
+    // Step 1: Recupera le recensioni dell'utente
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from("reviews")
+      .select("id, rating, comment, created_at, product_id")
+      .eq("user_id", user.value.id)
+      .order("created_at", { ascending: false });
+
+    if (reviewsError) throw reviewsError;
+
+    if (!reviewsData || reviewsData.length === 0) {
+      reviews.value = [];
+      return;
+    }
+
+    // Step 2: Ottieni i dettagli dei prodotti associati alle recensioni
+    const productIds = reviewsData.map((rev) => rev.product_id);
+
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select(
+        "id, name, price, description, discount_percentage, rating, review_count, metadata"
+      )
+      .in("id", productIds);
+
+    if (productsError) throw productsError;
+
+    // Step 3: Combina i dati delle recensioni con i prodotti corrispondenti
+    const processed = reviewsData
+      .map((review) => {
+        const product = productsData.find((p) => p.id === review.product_id);
+
+        if (!product) return null;
+
+        // Estrai l'URL immagine dal metadata o usa un placeholder
+        let imageUrl = "https://placehold.co/300x400?text=No+Image";
+        if (
+          product.metadata?.additional_images &&
+          product.metadata.additional_images.length > 0
+        ) {
+          imageUrl = product.metadata.additional_images[0];
+        }
+
+        return {
+          id: review.id,
+          rating: review.rating,
+          comment: review.comment,
+          created_at: review.created_at,
+          product_id: review.product_id,
+          product: {
+            ...product,
+            image_url: imageUrl,
+            price:
+              typeof product.price === "string"
+                ? parseFloat(product.price)
+                : product.price,
+          },
+        };
+      })
+      .filter((item) => item !== null);
+
+    reviews.value = processed;
+  } catch (error) {
+    console.error("Errore caricamento recensioni:", error);
+    reviews.value = [];
   }
 };
 
 const editReview = (review) => {
-  // Qui dovresti reindirizzare a una pagina/mostrare un modal per modificare la recensione
   console.log("Modifica recensione (da implementare):", review);
-  // router.push(`/products/${review.product_id}/review/${review.id}/edit`);
   alert("Funzionalità modifica recensione da implementare.");
 };
 
@@ -1251,33 +1025,24 @@ const deleteReview = async (reviewId) => {
       .from("reviews")
       .delete()
       .eq("id", reviewId)
-      .eq("user_id", user.value.id); // Sicurezza
+      .eq("user_id", user.value.id);
 
     if (error) throw error;
 
-    await fetchReviews(); // Aggiorna lista
+    await fetchReviews();
     successMessage.value = "Recensione eliminata.";
     setTimeout(() => {
       successMessage.value = "";
     }, 3000);
   } catch (error) {
-    errorMessage.value = `Errore eliminazione recensione: ${
-      error.message || error
-    }`;
     console.error("Error deleting review:", error);
   }
 };
 
-// --- Cart --- (Placeholder)
+// --- Cart ---
 const addToCart = (productId) => {
-  console.log(
-    `Aggiungi al carrello (da implementare): Prodotto ID ${productId}`
-  );
-  // Qui dovresti integrare la logica del tuo store carrello (es. Pinia)
-  // import { useCartStore } from '@/stores/cart';
-  // const cartStore = useCartStore();
-  // cartStore.addItem({ productId, quantity: 1 });
-  successMessage.value = "Prodotto aggiunto al carrello (simulazione).";
+  console.log(`Prodotto ID ${productId} aggiunto al carrello`);
+  successMessage.value = "Prodotto aggiunto al carrello.";
   setTimeout(() => {
     successMessage.value = "";
   }, 2000);
@@ -1296,7 +1061,6 @@ const validateAddress = () => {
     !newAddress.value.zip_code ||
     !newAddress.value.country
   ) {
-    errorMessage.value = "Tutti i campi obbligatori devono essere compilati.";
     return false;
   }
   return true;

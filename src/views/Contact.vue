@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-container">
     <!-- Navbar -->
     <Navbar />
 
@@ -19,15 +19,8 @@
     <div
       v-else
       class="chat-container">
-      <aside class="chat-sidebar">
-        <div class="chat-header">
-          <h2>Chat</h2>
-          <button
-            @click="showNewChatModal = true"
-            class="new-chat-btn">
-            <span>+</span> Nuova Chat
-          </button>
-        </div>
+      <div class="chat-sidebar">
+        <div class="chat-sidebar-header">Chat</div>
         <ul class="chat-list">
           <li
             v-for="chat in chats"
@@ -46,107 +39,113 @@
             <p>Nessuna conversazione disponibile</p>
           </li>
         </ul>
-      </aside>
-
-      <main class="chat-main">
-        <div
-          v-if="selectedChat"
-          class="chat-content">
-          <div class="chat-header">
-            <h2>{{ selectedChat.name }}</h2>
-          </div>
-
-          <div
-            class="chat-messages"
-            ref="messagesContainer">
+      </div>
+      <div class="chat-main">
+        <div class="chat-header">
+          {{ selectedChat ? selectedChat.name : "Seleziona una chat" }}
+        </div>
+        <div class="chat-content">
+          <div v-if="selectedChat">
             <div
-              v-for="message in messages"
-              :key="message.id"
-              :class="[
-                'message',
-                message.user_id === user?.id ? 'sent' : 'received',
-              ]">
-              <p>{{ message.text }}</p>
-              <small class="message-time">{{
-                formatTime(message.created_at)
-              }}</small>
+              class="chat-messages"
+              ref="messagesContainer">
+              <div
+                v-for="message in messages"
+                :key="message.id"
+                :class="[
+                  'message',
+                  message.user_id === user?.id ? 'sent' : 'received',
+                ]">
+                <p>{{ message.text }}</p>
+                <small class="message-time">{{
+                  formatTime(message.created_at)
+                }}</small>
+              </div>
+              <div
+                v-if="messages.length === 0"
+                class="no-messages">
+                <p>Nessun messaggio. Inizia la conversazione!</p>
+              </div>
             </div>
-
-            <div
-              v-if="messages.length === 0"
-              class="no-messages">
-              <p>Nessun messaggio. Inizia la conversazione!</p>
-            </div>
-          </div>
-
-          <div class="chat-input">
-            <input
-              type="text"
-              v-model="newMessage"
-              placeholder="Scrivi un messaggio..."
-              @keyup.enter="sendMessage" />
-            <button
-              @click="sendMessage"
-              :disabled="isSending">
-              Invia
-            </button>
-          </div>
-        </div>
-
-        <div
-          v-else
-          class="no-chat-selected">
-          <p>Seleziona una conversazione dalla lista o inizia una nuova chat</p>
-        </div>
-      </main>
-    </div>
-
-    <!-- Modal per nuova chat -->
-    <div
-      v-if="showNewChatModal"
-      class="modal">
-      <div class="modal-content">
-        <h3>Nuova Conversazione</h3>
-        <div
-          class="modal-close"
-          @click="showNewChatModal = false">
-          &times;
-        </div>
-
-        <div class="search-container">
-          <input
-            type="text"
-            v-model="searchTerm"
-            placeholder="Cerca un utente..."
-            @input="searchUsers" />
-
-          <div
-            v-if="searchResults.length > 0"
-            class="search-results">
-            <div
-              v-for="result in searchResults"
-              :key="result.id"
-              class="search-result-item"
-              @click="createChat(result)">
-              <h4>{{ result.first_name }} {{ result.last_name }}</h4>
-              <p>{{ result.email }}</p>
+            <div class="chat-input">
+              <input
+                type="text"
+                v-model="newMessage"
+                placeholder="Scrivi un messaggio..."
+                @keyup.enter="sendMessage" />
+              <button
+                @click="sendMessage"
+                :disabled="isSending">
+                Invia
+              </button>
             </div>
           </div>
-
           <div
-            v-else-if="searchTerm && !isSearching"
-            class="no-results">
-            <p>Nessun utente trovato</p>
-          </div>
-
-          <div
-            v-if="isSearching"
-            class="searching">
-            <p>Ricerca in corso...</p>
+            v-else
+            class="no-chat-selected">
+            <p>
+              Seleziona una conversazione dalla lista o inizia una nuova chat
+            </p>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Modal per nuova chat -->
+    <Transition name="modal">
+      <div
+        v-if="showNewChatModal"
+        class="modal"
+        @click="showNewChatModal = false">
+        <div
+          class="modal-content"
+          @click.stop>
+          <h3>Nuova Conversazione</h3>
+          <div
+            class="modal-close"
+            @click="showNewChatModal = false">
+            &times;
+          </div>
+
+          <div class="search-container">
+            <input
+              type="text"
+              v-model="searchTerm"
+              placeholder="Cerca un utente..."
+              @input="searchUsers"
+              autofocus />
+
+            <div
+              v-if="searchResults.length > 0"
+              class="search-results">
+              <div
+                v-for="result in searchResults"
+                :key="result.id"
+                class="search-result-item"
+                @click="createChat(result)">
+                <h4>{{ result.first_name }} {{ result.last_name }}</h4>
+                <p>{{ result.email }}</p>
+              </div>
+            </div>
+
+            <div
+              v-else-if="searchTerm && !isSearching"
+              class="no-results">
+              <p>Nessun utente trovato</p>
+            </div>
+
+            <div
+              v-if="isSearching"
+              class="searching">
+              <p>Ricerca in corso...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Add Footer -->
+    <Footer />
   </div>
 </template>
 
@@ -155,6 +154,7 @@ import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar.vue";
+import Footer from "@/components/footer.vue"; // Add this import
 
 // Supabase configuration - use just one instance
 const supabaseUrl = "https://tiylfyyfitqzwstftzpg.supabase.co";
@@ -168,6 +168,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 export default {
   components: {
     Navbar,
+    Footer, // Add Footer to components
   },
   setup() {
     const router = useRouter();
@@ -729,504 +730,432 @@ export default {
 }
 
 /* Base Layout */
-.chat-container {
-  display: flex;
-  height: calc(100vh - 140px);
-  background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  margin: 20px;
-  border-radius: 24px;
-  box-shadow: 0 12px 40px rgba(106, 13, 173, 0.08);
-  overflow: hidden;
-  border: 1px solid rgba(106, 13, 173, 0.1);
-}
-
-/* Enhanced Sidebar */
-.chat-sidebar {
-  width: 360px;
-  background-color: #ffffff;
-  border-right: 1px solid rgba(106, 13, 173, 0.1);
+.page-container {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.chat-header {
-  padding: 1.8rem;
-  background: linear-gradient(135deg, #6a0dad, #8a2be2);
-  color: white;
+/* Chat container */
+.chat-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 20px rgba(106, 13, 173, 0.2);
+  height: calc(100vh - 180px);
+  margin: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
 }
 
-.chat-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  color: #ffffff;
+/* Sidebar */
+.chat-sidebar {
+  width: 300px;
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
 }
 
-.new-chat-btn {
-  background: rgba(255, 255, 255, 0.15);
+/* Sidebar header */
+.chat-sidebar-header {
+  background: #6a0dad;
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 14px;
-  padding: 0.8rem 1.4rem;
-  font-size: 0.95rem;
+  padding: 16px;
+  font-size: 1.3rem;
   font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(8px);
-  font-size: 0.95rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  height: 60px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.new-chat-btn span {
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.new-chat-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
-}
-
-/* Improved Chat List */
-.chat-list {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.chat-item {
-  padding: 1.4rem;
-  border-bottom: 1px solid rgba(106, 13, 173, 0.08);
-  transition: all 0.3s ease;
-  cursor: pointer;
-  background: white;
-}
-
-.chat-item:hover {
-  background: linear-gradient(
-    to right,
-    rgba(106, 13, 173, 0.03),
-    rgba(106, 13, 173, 0.01)
-  );
-  transform: translateX(4px);
-}
-
-.active .chat-item {
-  background: linear-gradient(to right, rgba(106, 13, 173, 0.08), transparent);
-  border-left: 4px solid #6a0dad;
-}
-
-.chat-item h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #2d3436;
-  margin: 0 0 0.4rem 0;
-  line-height: 1.3;
-}
-
-.chat-item p {
-  color: #64748b;
-  font-size: 0.9rem;
-  margin: 0 0 0.3rem 0;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-item small {
-  color: #6a0dad;
-  font-size: 0.8rem;
-  font-weight: 500;
-  opacity: 0.8;
-}
-
-/* Main Chat Area */
+/* Main chat area */
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
+  height: 100%;
 }
 
-/* Enhanced Messages Area */
-.chat-messages {
-  padding: 2rem;
-  background: linear-gradient(170deg, #f8f9fa 0%, #ffffff 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  overflow-y: auto;
-}
-
-.message {
-  padding: 1.2rem 1.4rem;
-  border-radius: 18px;
-  max-width: 60%;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
-  position: relative;
-  transition: all 0.3s ease;
-  line-height: 1.5;
-  font-size: 0.95rem;
-}
-
-.message p {
-  margin: 0;
-  line-height: 1.5;
-}
-
-.message.sent {
-  background: linear-gradient(135deg, #6a0dad, #8a2be2);
+/* Chat header (DESTRA) */
+.chat-header {
+  background: #6a0dad;
   color: white;
-  align-self: flex-end;
-  border-bottom-right-radius: 4px;
-  animation: messageSent 0.3s ease;
-}
-
-.message.received {
-  background: white;
-  color: #2d3436;
-  align-self: flex-start;
-  border-bottom-left-radius: 4px;
-  border: 1px solid rgba(106, 13, 173, 0.1);
-  animation: messageReceived 0.3s ease;
-}
-
-@keyframes messageSent {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes messageReceived {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.message-time {
-  font-size: 0.75rem;
-  margin-top: 0.4rem;
-  opacity: 0.8;
-  display: block;
-}
-
-/* Improved Input Area */
-.chat-input {
-  padding: 1.5rem;
-  background: white;
-  border-top: 1px solid rgba(106, 13, 173, 0.1);
+  padding: 16px;
+  font-size: 1.3rem;
+  font-weight: 500;
+  height: 60px;
   display: flex;
-  gap: 1rem;
   align-items: center;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  /* RIMUOVI eventuali margin-top! */
 }
 
-.chat-input input {
+/* Chat list */
+.chat-list {
   flex: 1;
-  padding: 1rem 1.4rem;
-  border: 2px solid rgba(106, 13, 173, 0.1);
-  border-radius: 14px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  background: #f8f9fa;
-  font-size: 0.95rem;
-  color: #1e293b;
+  overflow-y: auto;
+  padding: 10px;
+  background: #fff;
 }
 
-.chat-input input:focus {
-  outline: none;
-  border-color: #6a0dad;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(106, 13, 173, 0.1);
-}
-
-.chat-input input::placeholder {
-  color: #94a3b8;
-  font-weight: 400;
-}
-
-.chat-input button {
-  padding: 1rem 2rem;
-  background: linear-gradient(135deg, #6a0dad, #8a2be2);
+/* New Chat Button */
+.new-chat-btn {
+  background: rgba(255, 255, 255, 0.2);
   color: white;
   border: none;
-  border-radius: 14px;
-  font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(106, 13, 173, 0.2);
-  font-size: 0.95rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.chat-input button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(106, 13, 173, 0.3);
+.new-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
-.chat-input button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+/* Chat list styles */
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
 }
 
-/* Modal Styles - Fixed */
+.chat-list li {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.chat-list li:hover {
+  background: #f8f7ff;
+}
+
+.chat-list li.active {
+  background: #f0e6ff;
+  border-left: 3px solid #6a0dad;
+}
+
+.chat-item {
+  padding: 12px;
+}
+
+.chat-item h3 {
+  font-size: 1rem;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.chat-item p {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-item small {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* Main chat area */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  overflow: hidden; /* Impedisce lo scroll del contenitore principale */
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 20px;
+  padding-bottom: 100px; /* Spazio per l'input box */
+  overflow-y: auto;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  max-height: calc(100% - 80px); /* Limita l'altezza per non sforare */
+  scrollbar-width: thin;
+  scrollbar-color: #6a0dad transparent;
+}
+
+.chat-input {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 24px;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 80px;
+  z-index: 10;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Modal Styles */
 .modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
+  align-items: center;
   z-index: 1000;
 }
 
 .modal-content {
-  position: relative;
   background: white;
-  border-radius: 20px;
-  padding: 2.5rem;
-  width: 95%;
-  max-width: 550px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  animation: modalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
-.modal-content h3 {
-  font-size: 1.8rem;
-  color: #6a0dad;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  font-size: 1.6rem;
-  color: #6a0dad;
-  margin: 0 0 1.5rem 0;
-  font-weight: 600;
-  line-height: 1.3;
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
 }
 
 .search-container {
-  position: relative;
+  margin-top: 20px;
 }
 
 .search-container input {
   width: 100%;
-  padding: 1rem 1.2rem;
-  font-size: 1.1rem;
-  border: 2px solid rgba(106, 13, 173, 0.1);
-  border-radius: 12px;
-  background-color: #f8f9fa;
-  transition: all 0.3s ease;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
 }
 
 .search-container input:focus {
   outline: none;
   border-color: #6a0dad;
-  background-color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(106, 13, 173, 0.1);
-}
-
-.search-container input::placeholder {
-  color: #94a3b8;
-  font-weight: 400;
+  box-shadow: 0 0 0 2px rgba(106, 13, 173, 0.1);
 }
 
 .search-results {
-  margin-top: 1rem;
-  border: 1px solid rgba(106, 13, 173, 0.1);
-  border-radius: 12px;
-  overflow: hidden;
-  max-height: 350px;
+  max-height: 300px;
   overflow-y: auto;
-  background: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .search-result-item {
-  padding: 1.2rem;
-  border-bottom: 1px solid rgba(106, 13, 173, 0.08);
-  transition: all 0.3s ease;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  transition: all 0.2s ease;
 }
 
 .search-result-item:last-child {
   border-bottom: none;
 }
 
+.search-result-item:hover {
+  background: #f8f7ff;
+}
+
 .search-result-item h4 {
-  font-size: 1.1rem;
-  color: #2d3436;
-  margin: 0;
-  font-weight: 500;
-  font-size: 1.05rem;
   color: #1e293b;
-  margin: 0;
-  font-weight: 500;
-  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
 .search-result-item p {
-  font-size: 0.9rem;
-  color: #6c757d;
-  margin: 0;
-  font-size: 0.9rem;
   color: #64748b;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.search-result-item:hover {
-  background-color: rgba(106, 13, 173, 0.05);
-  transform: translateX(5px);
-}
-
-.modal-close {
-  position: absolute;
-  top: 1.2rem;
-  right: 1.2rem;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(106, 13, 173, 0.1);
-  color: #6a0dad;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: none;
-}
-
-.modal-close:hover {
-  background: rgba(106, 13, 173, 0.2);
-  transform: rotate(90deg);
+  font-size: 0.9rem;
 }
 
 .no-results,
 .searching {
-  padding: 2rem;
   text-align: center;
-  color: #6c757d;
-  font-size: 1.1rem;
-  background: #f8f9fa;
-  border-radius: 12px;
-  margin-top: 1rem;
-}
-
-.searching {
-  color: #6a0dad;
-  background: rgba(106, 13, 173, 0.05);
-}
-
-@keyframes modalFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Loading and Error States */
-.loading,
-.error-message {
-  padding: 2rem;
-  text-align: center;
-  background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  animation: fadeIn 0.3s ease;
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.error-message {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc2626;
-  font-weight: 500;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.no-messages,
-.no-chat-selected {
+  padding: 20px;
   color: #64748b;
-  font-size: 1rem;
-  text-align: center;
-  padding: 2rem;
-  font-weight: 500;
-  background: rgba(106, 13, 173, 0.03);
-  border-radius: 12px;
-  line-height: 1.5;
 }
 
-.no-chats {
-  text-align: center;
-  padding: 2rem;
-  color: #64748b;
-  font-size: 0.95rem;
-  font-weight: 500;
-  background: rgba(106, 13, 173, 0.03);
-  margin: 1rem;
-  border-radius: 12px;
+/* Modal Animation */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
 }
 
-/* Responsive Design */
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+/* Media Queries */
 @media (max-width: 768px) {
   .chat-container {
     margin: 10px;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 140px);
   }
 
-  .chat-sidebar {
-    width: 100%;
-    max-height: 40vh;
-  }
-
-  .message {
-    max-width: 75%;
+  .chat-messages {
+    padding-bottom: 100px;
   }
 
   .chat-input {
-    padding: 1rem;
+    height: 70px;
+    padding: 12px;
   }
+}
+
+/* Messages styling */
+.message {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  position: relative;
+  margin: 8px 0;
+}
+
+.message p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.message.sent {
+  background: #6a0dad;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.message.received {
+  background: #f3f4f6;
+  color: #1e293b;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Chat messages scroll area */
+.chat-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 90px;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background-color: #6a0dad;
+  border-radius: 20px;
+  border: 2px solid #ffffff;
+}
+
+/* Input box styling */
+.chat-input {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 24px;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 80px;
+  z-index: 10;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 24px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.chat-input input:focus {
+  outline: none;
+  border-color: #6a0dad;
+  box-shadow: 0 0 0 2px rgba(106, 13, 173, 0.1);
+}
+
+.chat-input button {
+  padding: 12px 24px;
+  background: #6a0dad;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-input button:hover {
+  background: #5a0b8d;
+  transform: translateY(-1px);
+}
+
+.chat-input button:disabled {
+  background: #a884d1;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

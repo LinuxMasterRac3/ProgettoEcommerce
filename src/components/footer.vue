@@ -4,8 +4,9 @@
       <div class="about">
         <h2>PiegaLibro</h2>
         <p>
-          PiegaLibro è la tua libreria digitale di fiducia. Scopri, organizza e
-          condividi i tuoi libri preferiti.
+          Piego Libro è il primo eccomerce che permette di aquistare libri fra
+          privati sfruttando una opzione comoda eclogica proposta da poste
+          italiane. permetttendo il riuso al posto delle spreco.
         </p>
       </div>
       <div class="links">
