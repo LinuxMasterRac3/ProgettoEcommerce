@@ -39,15 +39,6 @@
             </button>
           </form>
 
-          <button
-            @click="signInWithGoogle"
-            class="google-signup">
-            <img
-              src="../assets/Google.png"
-              alt="Accedi con Google" />
-            Accedi con Google
-          </button>
-
           <a
             href="#"
             class="forgot-password-link"

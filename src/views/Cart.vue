@@ -213,6 +213,17 @@ const promoMessage = ref<string>("");
 const discount = ref<number>(0);
 const isPromoError = ref<boolean>(false);
 
+// Check if user is logged in
+const checkAuth = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    isAuthenticated.value = !!session;
+  } catch (err) {
+    console.error("Error checking authentication:", err);
+    isAuthenticated.value = false;
+  }
+};
+
 // Computed property for discounted total
 const discountedTotal = computed(() => {
   if (discount.value > 0) {
@@ -231,6 +242,7 @@ const fetchCartItems = async () => {
 
     if (savedCart.length === 0) {
       cartItems.value = [];
+      isLoading.value = false;
       return;
     }
 
@@ -241,14 +253,21 @@ const fetchCartItems = async () => {
 
     if (fetchError) throw fetchError;
 
+    if (!data || data.length === 0) {
+      cartItems.value = [];
+      isLoading.value = false;
+      return;
+    }
+
     cartItems.value = data.map((item) => ({
       id: item.id,
       name: item.name,
-      price: item.price,
+      price: parseFloat(item.price) || 0,
       quantity: 1,
-      metadata: item.metadata || {}, // Include il campo metadata
+      metadata: item.metadata || {},
     }));
   } catch (err) {
+    console.error("Error loading cart items:", err);
     error.value =
       "Impossibile caricare i dati del carrello. Riprova più tardi.";
   } finally {
@@ -307,12 +326,15 @@ const removeItem = (index: number) => {
 };
 
 // Recupera i dati al montaggio del componente
-onMounted(() => {
-  fetchCartItems();
+onMounted(async () => {
+  await checkAuth();
+  await fetchCartItems();
 });
 
 const applyPromoCode = () => {
   const code = promoCode.value.trim().toUpperCase(); // Pulisci e metti in maiuscolo
+  isPromoError.value = false;
+  
   if (code === "SCONTO10") {
     discount.value = 10;
     promoMessage.value = "Sconto 10% applicato!";
@@ -325,6 +347,7 @@ const applyPromoCode = () => {
       promoMessage.value = ""; // Nessun messaggio se vuoto
     } else {
       promoMessage.value = "Codice sconto non valido.";
+      isPromoError.value = true;
     }
   }
 };

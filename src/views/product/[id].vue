@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, User as SupabaseUser } from "@supabase/supabase-js";
 import Navbar from "../../components/Navbar.vue";
 import Footer from "../../components/footer.vue";
 
@@ -45,22 +45,16 @@ const addToCart = async () => {
   if (!product.value) return;
 
   try {
-    // Recupera il carrello dal localStorage
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-
-    // Controlla se il libro è già nel carrello
-    if (cart.includes(product.value.id)) {
+    if (!cart.includes(product.value.id)) {
+      cart.push(product.value.id);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      alert("Libro aggiunto al carrello!");
+    } else {
       alert("Questo libro è già nel carrello.");
-      return;
     }
-
-    // Aggiungi l'ID del libro al carrello
-    cart.push(product.value.id);
-    localStorage.setItem("cart", JSON.stringify(cart));
-
-    alert("Libro aggiunto al carrello!");
-  } catch (error) {
-    console.error("Errore durante l'aggiunta al carrello:", error);
+  } catch (err) {
+    console.error("Errore durante l'aggiunta al carrello:", err);
     alert("Si è verificato un errore. Riprova più tardi.");
   }
 };
@@ -74,13 +68,43 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Component state
 const route = useRoute();
 const router = useRouter(); // Aggiunta istanza del router
-const productId = route.params.id as string;
+const productId = ref(route.params.id as string); // Make productId a ref
 const product = ref<Book | null>(null);
 const seller = ref<User | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 const selectedImageIndex = ref(0); // Track the currently selected image index
 const relatedBooks = ref<Book[]>([]); // Add state for related books
+
+// --- Favorites State ---
+const isFavorite = ref(false);
+const currentUserId = ref<string | null>(null);
+
+// Function to check authentication and favorite status
+const checkAuthAndFavoriteStatus = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    currentUserId.value = user.id;
+    if (product.value) {
+      const { data: favoriteItem, error: favError } = await supabase
+        .from("favorites")
+        .select("id")
+        .eq("user_id", currentUserId.value)
+        .eq("product_id", product.value.id)
+        .single();
+      if (favError && favError.code !== "PGRST116") {
+        // PGRST116: no rows found
+        console.error("Error checking favorite status:", favError);
+      }
+      isFavorite.value = !!favoriteItem;
+    }
+  } else {
+    currentUserId.value = null;
+    isFavorite.value = false;
+  }
+};
 
 // Funzione per cambiare l'immagine principale quando si clicca su una thumbnail
 const setMainImage = (index: number) => {
@@ -144,6 +168,40 @@ const contactSeller = () => {
   });
 };
 
+const toggleFavoriteProduct = async () => {
+  if (!currentUserId.value) {
+    alert("Devi effettuare il login per aggiungere ai preferiti.");
+    router.push({ path: "/login", query: { redirect: route.fullPath } });
+    return;
+  }
+  if (!product.value) return;
+
+  try {
+    if (isFavorite.value) {
+      // Remove from favorites
+      const { error: deleteError } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", currentUserId.value)
+        .eq("product_id", product.value.id);
+      if (deleteError) throw deleteError;
+      isFavorite.value = false;
+      // console.log(`Product ${product.value.id} removed from favorites.`);
+    } else {
+      // Add to favorites
+      const { error: insertError } = await supabase
+        .from("favorites")
+        .insert({ user_id: currentUserId.value, product_id: product.value.id });
+      if (insertError) throw insertError;
+      isFavorite.value = true;
+      // console.log(`Product ${product.value.id} added to favorites.`);
+    }
+  } catch (err) {
+    console.error("Error toggling favorite:", err);
+    alert("Errore nell'aggiornamento dei preferiti.");
+  }
+};
+
 // Fetch product details
 const fetchProductDetails = async () => {
   isLoading.value = true;
@@ -153,7 +211,7 @@ const fetchProductDetails = async () => {
     const { data: productData, error: productError } = await supabase
       .from("products")
       .select("*")
-      .eq("id", productId)
+      .eq("id", productId.value)
       .single();
 
     if (productError) throw productError;
@@ -174,42 +232,50 @@ const fetchProductDetails = async () => {
 
       if (productData.user_id) {
         try {
-          // Get the user directly from auth.users first to ensure we have an email and basic user info
-          const { data: authUserData, error: authUserError } =
-            await supabase.auth.admin.getUserById(productData.user_id);
-
-          if (authUserError) {
-            console.error("Error fetching auth user data:", authUserError);
-          }
-
-          // Then get the profile data which might have additional fields
+          // Approach 1: Try to directly fetch the public user info
           const { data: userData, error: userError } = await supabase
             .from("profiles")
-            .select(
-              "first_name, last_name, phone, description, profile_image, created_at"
-            )
+            .select("*")
             .eq("id", productData.user_id)
-            .maybeSingle(); // Use maybeSingle instead of single to handle missing profile gracefully
+            .single();
 
-          if (userError && userError.code !== "PGRST116") {
+          if (userError) {
             console.error("Error fetching seller profile:", userError);
           }
 
-          // Merge the data from auth.users and profiles
+          // Approach 2: Try to use the current user's auth context if the product is theirs
+          const {
+            data: { user: currentUser },
+          } = await supabase.auth.getUser();
+          const isCurrentUserProduct =
+            currentUser && currentUser.id === productData.user_id;
+
+          // Determine which name to display based on available data
+          let sellerName = "Venditore";
+          if (userData && (userData.first_name || userData.last_name)) {
+            // We have profile data, use that
+            sellerName = `${userData.first_name || ""} ${
+              userData.last_name || ""
+            }`.trim();
+          } else if (isCurrentUserProduct && currentUser?.user_metadata?.name) {
+            // If it's the current user's product and we have metadata
+            sellerName = currentUser.user_metadata.name;
+          } else if (productData.metadata?.author) {
+            // Fallback to the author in the product metadata
+            sellerName = productData.metadata.author;
+          }
+
+          // Construct seller object with the best available data
           seller.value = {
             id: productData.user_id,
-            username: authUserData?.user?.user_metadata?.username || "Utente",
-            email: authUserData?.user?.email,
-            full_name: userData
-              ? `${userData.first_name || ""} ${
-                  userData.last_name || ""
-                }`.trim()
-              : authUserData?.user?.user_metadata?.name || "Utente Supabase",
-            avatar_url: userData?.profile_image,
-            location: userData?.location,
+            username: userData?.username || "Utente",
+            email: isCurrentUserProduct ? currentUser?.email : null,
+            full_name: sellerName,
+            avatar_url: userData?.profile_image || null,
+            location: userData?.location || productData.metadata?.location,
             phone: userData?.phone,
-            rating: 5, // Default rating or from another source
-            memberSince: userData?.created_at || authUserData?.user?.created_at,
+            rating: 5, // Default rating
+            memberSince: userData?.created_at || productData.created_at,
           };
         } catch (profileError) {
           console.error("Failed to fetch seller profile:", profileError);
@@ -223,7 +289,10 @@ const fetchProductDetails = async () => {
       }
 
       // Fetch related books with smarter query
-      let query = supabase.from("products").select("*").neq("id", productId);
+      let query = supabase
+        .from("products")
+        .select("*")
+        .neq("id", productId.value);
 
       // If we have a category, try to find books in the same category
       if (productData.metadata?.category) {
@@ -249,7 +318,7 @@ const fetchProductDetails = async () => {
         const { data: anyBooks, error: anyBooksError } = await supabase
           .from("products")
           .select("*")
-          .neq("id", productId)
+          .neq("id", productId.value)
           .limit(4);
 
         if (!anyBooksError) {
@@ -286,9 +355,37 @@ const fetchProductDetails = async () => {
 };
 
 // Fetch product details on component mount
-onMounted(() => {
-  fetchProductDetails();
+onMounted(async () => {
+  await fetchProductDetails();
+
+  // Listen for auth changes
+  const { data: authListener } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      const oldUserId = currentUserId.value;
+      if (session?.user) {
+        currentUserId.value = session.user.id;
+      } else {
+        currentUserId.value = null;
+      }
+      // Re-check favorite status if user changed or product is loaded
+      if (product.value && oldUserId !== currentUserId.value) {
+        await checkAuthAndFavoriteStatus();
+      }
+    }
+  );
+  // Consider cleanup for authListener if needed, though usually handled by Supabase client
 });
+
+// Watch for route param changes to refetch product
+watch(
+  () => route.params.id,
+  async (newId) => {
+    if (newId && typeof newId === "string") {
+      productId.value = newId; // Update the ref
+      await fetchProductDetails();
+    }
+  }
+);
 </script>
 
 <template>
@@ -360,6 +457,15 @@ onMounted(() => {
                 class="add-to-cart-button"
                 @click="addToCart">
                 Aggiungi al carrello
+              </button>
+              <button
+                @click="toggleFavoriteProduct"
+                class="favorite-button"
+                :class="{ 'is-favorite': isFavorite }">
+                <i class="fas fa-heart"></i>
+                {{
+                  isFavorite ? "Rimuovi dai Preferiti" : "Aggiungi ai Preferiti"
+                }}
               </button>
             </div>
             <div class="shipping-info">
@@ -635,6 +741,35 @@ onMounted(() => {
 
 .buy-button:hover {
   background-color: #5a4cbf;
+}
+
+.favorite-button {
+  padding: 12px 20px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s, color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.favorite-button:hover {
+  background-color: #e0e0e0;
+}
+
+.favorite-button.is-favorite {
+  background-color: #ffebee; /* Light pink for favorited */
+  color: #e91e63; /* Pinkish color for icon and text */
+  border-color: #e91e63;
+}
+
+.favorite-button.is-favorite i {
+  color: #e91e63;
 }
 
 .shipping-info {
@@ -1010,6 +1145,35 @@ onMounted(() => {
 
 .buy-button:hover {
   background-color: #5a4cbf;
+}
+
+.favorite-button {
+  padding: 12px 20px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s, color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.favorite-button:hover {
+  background-color: #e0e0e0;
+}
+
+.favorite-button.is-favorite {
+  background-color: #ffebee; /* Light pink for favorited */
+  color: #e91e63; /* Pinkish color for icon and text */
+  border-color: #e91e63;
+}
+
+.favorite-button.is-favorite i {
+  color: #e91e63;
 }
 
 .shipping-info {

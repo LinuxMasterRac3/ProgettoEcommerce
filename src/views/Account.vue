@@ -409,10 +409,6 @@
         Vai al Login
       </button>
     </div>
-    <div class="login-message">
-      Se non hai un account, puoi registrarti
-      <router-link to="/register">qui</router-link>.
-    </div>
   </div>
 </template>
 
@@ -1041,11 +1037,29 @@ const deleteReview = async (reviewId) => {
 
 // --- Cart ---
 const addToCart = (productId) => {
-  console.log(`Prodotto ID ${productId} aggiunto al carrello`);
-  successMessage.value = "Prodotto aggiunto al carrello.";
-  setTimeout(() => {
-    successMessage.value = "";
-  }, 2000);
+  // Ensure user is logged in, though cart is local, actions might be tied to user context
+  if (!user.value?.id) {
+    alert("Devi essere loggato per eseguire questa azione."); // Or handle as per app's auth flow
+    return;
+  }
+  try {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    if (!cart.includes(productId)) {
+      cart.push(productId);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      successMessage.value = "Prodotto aggiunto al carrello.";
+    } else {
+      // Optionally, provide feedback that it's already in cart
+      successMessage.value = "Questo prodotto è già nel carrello.";
+    }
+    setTimeout(() => {
+      successMessage.value = "";
+    }, 2000);
+  } catch (error) {
+    console.error("Errore durante l'aggiunta al carrello:", error);
+    // Optionally, set an error message to be displayed to the user
+    // errorMessage.value = "Impossibile aggiungere il prodotto al carrello.";
+  }
 };
 
 // --- Navigation ---

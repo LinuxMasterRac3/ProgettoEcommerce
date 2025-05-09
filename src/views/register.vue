@@ -43,15 +43,6 @@
             </button>
           </form>
 
-          <button
-            @click="signUpWithGoogle"
-            class="google-signup">
-            <img
-              src="../assets/Google.png"
-              alt="Sign up con Google" />
-            Registrati con Google
-          </button>
-
           <p class="account-info">
             Hai già un account? <router-link to="/login">Accedi</router-link>
           </p>

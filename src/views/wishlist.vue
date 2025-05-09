@@ -47,7 +47,7 @@
                 class="wishlist-image-link">
                 <img
                   :src="getMainImage(item)"
-                  :alt="item.title"
+                  :alt="item.name"
                   class="wishlist-image"
                   @error="handleImageError($event)" />
               </RouterLink>
@@ -55,7 +55,7 @@
                 <RouterLink
                   :to="`/product/${item.id}`"
                   class="wishlist-title-link">
-                  <h2 class="wishlist-item-title">{{ item.title }}</h2>
+                  <h2 class="wishlist-item-title">{{ item.name }}</h2>
                 </RouterLink>
                 <p class="wishlist-item-author">
                   Autore: {{ item.metadata.author || "Sconosciuto" }}
@@ -94,7 +94,7 @@ import { RouterLink } from "vue-router";
 // Define interface for wishlist item type
 interface WishlistItem {
   id: string;
-  title: string;
+  name: string; // Changed from title to name to match Supabase structure
   price: number;
   metadata: any;
   image: string;
@@ -110,17 +110,29 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const wishlistItems = ref<WishlistItem[]>([]); // Typed array for wishlist items
 const isLoading = ref(true); // Stato di caricamento
 const error = ref<string | null>(null); // Messaggio di errore
-const wishlist = ref<string[]>([]); // Array per memorizzare gli ID dei libri nella wishlist
+// const wishlist = ref<string[]>([]); // This ref seems unused, can be removed if not needed
 const userId = ref<string | null>(null); // ID dell'utente autenticato
 
-// Recupera l'ID dell'utente autenticato
-const fetchUserId = async () => {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) {
-    console.error("Errore durante il recupero dell'utente:", error);
-    return;
+// Check if user is logged in
+const router = useRouter();
+const isAuthenticated = ref(false);
+
+const checkAuth = async () => {
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      userId.value = data.user.id;
+      isAuthenticated.value = true;
+    } else {
+      isAuthenticated.value = false;
+      error.value =
+        "Devi effettuare il login per visualizzare la tua wishlist.";
+    }
+  } catch (err) {
+    console.error("Errore durante il recupero dell'utente:", err);
+    isAuthenticated.value = false;
+    error.value = "Errore durante l'autenticazione.";
   }
-  userId.value = data?.user?.id || null;
 };
 
 // Recupera i libri dalla wishlist
@@ -128,46 +140,94 @@ const fetchWishlist = async () => {
   isLoading.value = true;
   error.value = null;
 
-  try {
-    const savedWishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+  if (!isAuthenticated.value || !userId.value) {
+    error.value = "Devi effettuare il login per visualizzare la tua wishlist.";
+    wishlistItems.value = [];
+    isLoading.value = false;
+    // Consider redirecting or showing a more prominent login message
+    // setTimeout(() => router.push("/login"), 3000);
+    return;
+  }
 
-    if (savedWishlist.length === 0) {
+  try {
+    // Step 1: Fetch favorite product IDs from Supabase
+    const { data: favoriteEntries, error: favError } = await supabase
+      .from("favorites")
+      .select("product_id")
+      .eq("user_id", userId.value);
+
+    if (favError) throw favError;
+
+    const favoriteProductIds = favoriteEntries
+      ? favoriteEntries.map((fav) => fav.product_id)
+      : [];
+
+    if (favoriteProductIds.length === 0) {
       wishlistItems.value = [];
+      isLoading.value = false;
       return;
     }
 
-    const { data, error: fetchError } = await supabase
-      .from("products") // Usa il nome corretto della tabella
-      .select("*")
-      .in("id", savedWishlist);
+    // Step 2: Fetch product details for these IDs
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("*") // Select all necessary fields
+      .in("id", favoriteProductIds);
 
-    if (fetchError) throw fetchError;
+    if (productsError) throw productsError;
 
-    wishlistItems.value = data.map((item) => ({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      metadata: item.metadata || {},
-      image: item.image_url || "https://placehold.co/300x400?text=No+Image",
-    }));
+    if (!productsData || productsData.length === 0) {
+      wishlistItems.value = [];
+    } else {
+      wishlistItems.value = productsData.map((item) => ({
+        id: item.id,
+        name: item.name || "Prodotto senza nome",
+        price: parseFloat(item.price) || 0,
+        metadata: item.metadata || {},
+        image: getMainImage({
+          metadata: item.metadata,
+          image_url: item.image_url,
+        }), // Use getMainImage logic
+      }));
+    }
   } catch (err) {
     console.error("Errore durante il caricamento della wishlist:", err);
     error.value = "Errore durante il caricamento della wishlist.";
+    wishlistItems.value = [];
   } finally {
     isLoading.value = false;
   }
 };
 
-// Rimuovi un libro dalla wishlist
-const removeFromWishlist = (id: string) => {
-  wishlistItems.value = wishlistItems.value.filter((item) => item.id !== id);
+// Rimuovi un libro dalla wishlist (e da Supabase)
+const removeFromWishlist = async (productId: string) => {
+  // Renamed id to productId for clarity
+  if (!isAuthenticated.value || !userId.value) {
+    alert("Devi essere loggato per modificare i preferiti.");
+    return;
+  }
+  try {
+    // Remove from Supabase
+    const { error: deleteError } = await supabase
+      .from("favorites")
+      .delete()
+      .eq("user_id", userId.value)
+      .eq("product_id", productId);
 
-  // Aggiorna la wishlist salvata in localStorage
-  const savedWishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
-  const updatedWishlist = savedWishlist.filter(
-    (itemId: string) => itemId !== id
-  );
-  localStorage.setItem("wishlist", JSON.stringify(updatedWishlist));
+    if (deleteError) throw deleteError;
+
+    // Update local list
+    wishlistItems.value = wishlistItems.value.filter(
+      (item) => item.id !== productId
+    );
+
+    // The localStorage part for "wishlist" key can be removed if Supabase is the single source of truth
+    // for authenticated users' favorites.
+    // console.log(`Product ${productId} removed from favorites via wishlist page.`);
+  } catch (err) {
+    console.error("Error removing from wishlist:", err);
+    alert("Errore durante la rimozione dai preferiti.");
+  }
 };
 
 // Gestione immagine di fallback
@@ -178,70 +238,39 @@ const handleImageError = (event: Event) => {
 
 // Funzione per ottenere l'immagine principale
 const getMainImage = (item: any) => {
+  // item can be a product or a wishlist item
   if (
     item.metadata?.additional_images &&
     item.metadata.additional_images.length > 0
   ) {
     return item.metadata.additional_images[0];
   }
-  return item.image || "https://placehold.co/300x400?text=No+Image";
+  // Fallback to item.image (used by wishlist item structure) or item.image_url (used by product structure)
+  return (
+    item.image || item.image_url || "https://placehold.co/300x400?text=No+Image"
+  );
 };
 
-// Funzione per aggiungere/rimuovere un prodotto dai preferiti
-const toggleFavorite = async (productId: string) => {
-  if (!userId.value) {
-    console.error("Utente non autenticato.");
-    return;
-  }
-
-  try {
-    // Controlla se il prodotto è già nei preferiti
-    const { data: existingFavorite, error: fetchError } = await supabase
-      .from("favorites")
-      .select("*")
-      .eq("user_id", userId.value)
-      .eq("product_id", productId)
-      .single();
-
-    if (fetchError && fetchError.code !== "PGRST116") {
-      // Ignora l'errore "PGRST116" (nessun record trovato)
-      throw fetchError;
-    }
-
-    if (existingFavorite) {
-      // Rimuovi il prodotto dai preferiti
-      const { error: deleteError } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("id", existingFavorite.id);
-
-      if (deleteError) throw deleteError;
-
-      console.log(`Prodotto con ID ${productId} rimosso dai preferiti.`);
-    } else {
-      // Aggiungi il prodotto ai preferiti
-      const { error: insertError } = await supabase.from("favorites").insert({
-        user_id: userId.value,
-        product_id: productId,
-      });
-
-      if (insertError) throw insertError;
-
-      console.log(`Prodotto con ID ${productId} aggiunto ai preferiti.`);
-    }
-  } catch (err) {
-    console.error("Errore durante l'aggiornamento dei preferiti:", err);
-  }
+// Funzione per aggiungere/rimuovere un prodotto dai preferiti (used by heart icon on wishlist items)
+// This function's name might be confusing if `removeFromWishlist` is also present.
+// Let's assume this `toggleFavorite` is for the heart icon on the wishlist page,
+// which effectively means removing it from the wishlist.
+const toggleFavoriteOnWishlistPage = async (productId: string) => {
+  // This function will essentially call removeFromWishlist
+  await removeFromWishlist(productId);
 };
 
 // Recupera i dati al montaggio del componente
 onMounted(async () => {
-  await fetchUserId();
-  const savedWishlist = localStorage.getItem("wishlist");
-  if (savedWishlist) {
-    wishlist.value = JSON.parse(savedWishlist);
+  await checkAuth();
+  if (isAuthenticated.value) {
+    await fetchWishlist();
+  } else {
+    // Optional: redirect to login after a delay if not authenticated
+    // setTimeout(() => {
+    //   router.push("/login");
+    // }, 3000);
   }
-  fetchWishlist();
 });
 </script>
 

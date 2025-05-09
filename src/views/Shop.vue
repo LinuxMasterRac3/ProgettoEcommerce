@@ -4,7 +4,7 @@ import { RouterLink, useRouter } from "vue-router";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "../components/Navbar.vue";
 import Footer from "../components/footer.vue";
-import { onUnmounted } from "vue";
+import { onUnmounted, watch } from "vue";
 
 // Slider data
 const slides = ref([
@@ -108,6 +108,39 @@ const searchData = ref({
 const recentBooks = ref<Book[]>([]);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
+
+// --- Favorites State ---
+const favoriteProductIds = ref<string[]>([]);
+const currentUserId = ref<string | null>(null);
+
+// Function to check authentication status and fetch user ID
+const checkUserAuth = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    currentUserId.value = user.id;
+    await fetchUserFavorites(); // Fetch favorites if user is logged in
+  } else {
+    currentUserId.value = null;
+    favoriteProductIds.value = []; // Clear favorites if not logged in
+  }
+};
+
+// Function to fetch user's favorites
+const fetchUserFavorites = async () => {
+  if (!currentUserId.value) return;
+  try {
+    const { data, error: favError } = await supabase
+      .from("favorites")
+      .select("product_id")
+      .eq("user_id", currentUserId.value);
+    if (favError) throw favError;
+    favoriteProductIds.value = data ? data.map((fav) => fav.product_id) : [];
+  } catch (err) {
+    console.error("Error fetching favorites:", err);
+  }
+};
 
 // Search functionality
 const searchProducts = () => {
@@ -255,18 +288,40 @@ const calculateDiscountedPrice = (book: Book): string => {
 };
 
 // Favorite/Wishlist functionality
-const toggleFavorite = async (bookId: string) => {
+const toggleFavorite = async (bookId: string, event: Event) => {
+  event.stopPropagation(); // Prevent card click
+  if (!currentUserId.value) {
+    alert("Devi effettuare il login per aggiungere ai preferiti.");
+    // Optionally redirect to login: router.push('/login');
+    return;
+  }
+
   try {
-    console.log("Toggle favorite for book ID:", bookId);
-    // Add your wishlist toggle functionality here
-    // Example:
-    // const { data, error } = await supabase.from('favorites').upsert({
-    //   user_id: userId,
-    //   product_id: bookId,
-    //   created_at: new Date()
-    // });
+    const isCurrentlyFavorite = favoriteProductIds.value.includes(bookId);
+    if (isCurrentlyFavorite) {
+      // Remove from favorites
+      const { error: deleteError } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", currentUserId.value)
+        .eq("product_id", bookId);
+      if (deleteError) throw deleteError;
+      favoriteProductIds.value = favoriteProductIds.value.filter(
+        (id) => id !== bookId
+      );
+      // console.log(`Book ${bookId} removed from favorites.`);
+    } else {
+      // Add to favorites
+      const { error: insertError } = await supabase
+        .from("favorites")
+        .insert({ user_id: currentUserId.value, product_id: bookId });
+      if (insertError) throw insertError;
+      favoriteProductIds.value.push(bookId);
+      // console.log(`Book ${bookId} added to favorites.`);
+    }
   } catch (err) {
     console.error("Error toggling favorite:", err);
+    alert("Errore nell'aggiornamento dei preferiti.");
   }
 };
 
@@ -276,17 +331,17 @@ const addToCart = async (bookId: string, event: Event) => {
   event.stopPropagation();
 
   try {
-    console.log("Adding to cart book ID:", bookId);
-    // Implementa qui la logica per aggiungere al carrello
-    // Esempio:
-    // const { data, error } = await supabase.from('cart').insert({
-    //   user_id: currentUserId,
-    //   product_id: bookId,
-    //   quantity: 1,
-    //   created_at: new Date()
-    // });
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    if (!cart.includes(bookId)) {
+      cart.push(bookId);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      alert("Libro aggiunto al carrello!");
+    } else {
+      alert("Questo libro è già nel carrello.");
+    }
   } catch (err) {
     console.error("Error adding to cart:", err);
+    alert("Si è verificato un errore durante l'aggiunta al carrello.");
   }
 };
 
@@ -296,8 +351,33 @@ const viewProductDetails = (bookId: string) => {
 };
 
 // Fetch books when component is mounted
-onMounted(() => {
+onMounted(async () => {
   fetchRecentBooks();
+  fetchComuni();
+  await checkUserAuth(); // Check auth and fetch favorites
+
+  // Listen for auth changes to update favorites
+  const { data: authListener } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        currentUserId.value = session.user.id;
+        await fetchUserFavorites();
+      } else if (event === "SIGNED_OUT") {
+        currentUserId.value = null;
+        favoriteProductIds.value = [];
+      }
+    }
+  );
+
+  // Cleanup listener on unmount
+  onUnmounted(() => {
+    if (
+      authListener &&
+      typeof authListener.subscription?.unsubscribe === "function"
+    ) {
+      authListener.subscription.unsubscribe();
+    }
+  });
 });
 
 // Add these with your existing refs
@@ -769,7 +849,10 @@ onMounted(() => {
                 <div class="product-actions">
                   <button
                     class="action-button favorite-button"
-                    @click.stop="toggleFavorite(book.id)"
+                    :class="{
+                      'is-favorite': favoriteProductIds.includes(book.id),
+                    }"
+                    @click="toggleFavorite(book.id, $event)"
                     title="Aggiungi ai preferiti">
                     <i class="fas fa-heart"></i>
                   </button>
@@ -1379,6 +1462,15 @@ nav.nav-buttons {
 .favorite-button:hover {
   background-color: #e8e6f8; /* Changed from #ffebee */
   color: #6a5acd; /* Changed from #e91e63 */
+}
+
+/* Style for when an item is favorited */
+.action-button.favorite-button.is-favorite i {
+  color: #e91e63; /* Pinkish color for active favorite */
+  /* font-weight: bold; /* Optional: if your icon font supports it */
+}
+.action-button.favorite-button.is-favorite {
+  background-color: #ffebee; /* Light pink background for active favorite */
 }
 
 .cart-button:hover {
