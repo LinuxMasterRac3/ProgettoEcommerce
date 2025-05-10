@@ -44,18 +44,47 @@ interface User {
 const addToCart = async () => {
   if (!product.value) return;
 
+  // Verificare che l'utente sia autenticato
+  if (!currentUserId.value) {
+    alert("Devi effettuare il login per aggiungere al carrello.");
+    router.push({ path: "/login", query: { redirect: route.fullPath } });
+    return;
+  }
+
   try {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    if (!cart.includes(product.value.id)) {
-      cart.push(product.value.id);
-      localStorage.setItem("cart", JSON.stringify(cart));
-      alert("Libro aggiunto al carrello!");
+    // Verifica se l'elemento è già nel carrello
+    const { data: existingItem, error: checkError } = await supabase
+      .from("user_carts")
+      .select("id, quantity")
+      .eq("user_id", currentUserId.value)
+      .eq("product_id", product.value.id)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+
+    if (existingItem) {
+      // Se l'elemento esiste già, aumenta la quantità
+      const { error: updateError } = await supabase
+        .from("user_carts")
+        .update({ quantity: existingItem.quantity + 1 })
+        .eq("id", existingItem.id);
+
+      if (updateError) throw updateError;
+      alert("Quantità aumentata nel carrello!");
     } else {
-      alert("Questo libro è già nel carrello.");
+      // Se l'elemento non esiste, aggiungilo
+      const { error: insertError } = await supabase.from("user_carts").insert({
+        user_id: currentUserId.value,
+        product_id: product.value.id,
+        quantity: 1,
+      });
+
+      if (insertError) throw insertError;
+      alert("Libro aggiunto al carrello!");
     }
   } catch (err) {
-    console.error("Errore durante l'aggiunta al carrello:", err);
-    alert("Si è verificato un errore. Riprova più tardi.");
+    console.error("Error adding to cart:", err);
+    alert("Si è verificato un errore durante l'aggiunta al carrello.");
   }
 };
 

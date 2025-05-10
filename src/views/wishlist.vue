@@ -144,12 +144,25 @@ const fetchWishlist = async () => {
     error.value = "Devi effettuare il login per visualizzare la tua wishlist.";
     wishlistItems.value = [];
     isLoading.value = false;
-    // Consider redirecting or showing a more prominent login message
-    // setTimeout(() => router.push("/login"), 3000);
     return;
   }
 
   try {
+    // Check if favorites table exists
+    const { error: tableCheckError } = await supabase
+      .from("favorites")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (tableCheckError && tableCheckError.code === "42P01") {
+      error.value = "Lista dei desideri non disponibile. Contatta l'amministratore.";
+      console.error("Favorites table doesn't exist! Run the database setup script.");
+      wishlistItems.value = [];
+      isLoading.value = false;
+      return;
+    }
+    
     // Step 1: Fetch favorite product IDs from Supabase
     const { data: favoriteEntries, error: favError } = await supabase
       .from("favorites")
@@ -167,6 +180,8 @@ const fetchWishlist = async () => {
       isLoading.value = false;
       return;
     }
+    
+    console.log("Found favorite IDs:", favoriteProductIds);
 
     // Step 2: Fetch product details for these IDs
     const { data: productsData, error: productsError } = await supabase
@@ -179,6 +194,7 @@ const fetchWishlist = async () => {
     if (!productsData || productsData.length === 0) {
       wishlistItems.value = [];
     } else {
+      console.log("Fetched favorite products:", productsData.length);
       wishlistItems.value = productsData.map((item) => ({
         id: item.id,
         name: item.name || "Prodotto senza nome",
@@ -187,12 +203,12 @@ const fetchWishlist = async () => {
         image: getMainImage({
           metadata: item.metadata,
           image_url: item.image_url,
-        }), // Use getMainImage logic
+        }),
       }));
     }
   } catch (err) {
     console.error("Errore durante il caricamento della wishlist:", err);
-    error.value = "Errore durante il caricamento della wishlist.";
+    error.value = "Errore durante il caricamento della wishlist: " + (err.message || err);
     wishlistItems.value = [];
   } finally {
     isLoading.value = false;

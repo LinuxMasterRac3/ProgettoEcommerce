@@ -427,6 +427,11 @@ CREATE POLICY "Users can delete their own chats"
   ON chats FOR DELETE 
   USING (auth.uid() = user_id);
 
+-- Add indexes for chats table for performance
+CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
+CREATE INDEX IF NOT EXISTS idx_chats_contact_id ON chats(contact_id);
+CREATE INDEX IF NOT EXISTS idx_chats_updated_at ON chats(updated_at DESC);
+
 -- Tabella per i messaggi
 CREATE TABLE IF NOT EXISTS messages (
   id uuid default uuid_generate_v4() primary key,
@@ -475,6 +480,10 @@ CREATE POLICY "Users can delete messages they sent"
   ON messages FOR DELETE 
   USING (auth.uid() = user_id);
 
+-- Add index for messages table for performance
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
 -- Trigger per aggiornare il timestamp della chat quando viene inviato un nuovo messaggio
 CREATE OR REPLACE FUNCTION update_chat_timestamp()
 RETURNS TRIGGER AS $$
@@ -491,3 +500,48 @@ CREATE TRIGGER update_chat_timestamp_trigger
 AFTER INSERT ON messages
 FOR EACH ROW
 EXECUTE FUNCTION update_chat_timestamp();
+
+-- Tabella per i carrelli degli utenti
+CREATE TABLE IF NOT EXISTS user_carts (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  product_id uuid references products on delete cascade not null,
+  quantity integer not null default 1 CHECK (quantity > 0),
+  added_at timestamp with time zone default now(),
+  CONSTRAINT user_product_unique UNIQUE (user_id, product_id)
+);
+
+-- Create user_carts table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.user_carts (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  product_id uuid references products on delete cascade not null,
+  quantity integer not null default 1 CHECK (quantity > 0),
+  added_at timestamp with time zone default now(),
+  CONSTRAINT user_product_unique UNIQUE (user_id, product_id)
+);
+
+-- Enable RLS on the table
+ALTER TABLE public.user_carts ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for user_carts
+DROP POLICY IF EXISTS "Users can view their own cart items" ON user_carts;
+CREATE POLICY "Users can view their own cart items"
+  ON user_carts FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert items into their own cart" ON user_carts;
+CREATE POLICY "Users can insert items into their own cart"
+  ON user_carts FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own cart items" ON user_carts;
+CREATE POLICY "Users can update their own cart items"
+  ON user_carts FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete items from their own cart" ON user_carts;
+CREATE POLICY "Users can delete items from their own cart"
+  ON user_carts FOR DELETE
+  USING (auth.uid() = user_id);

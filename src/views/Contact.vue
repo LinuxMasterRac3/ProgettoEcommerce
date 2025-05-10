@@ -201,13 +201,22 @@ export default {
 
     // Load chats
     const loadChats = async () => {
+      isLoading.value = true;
+      error.value = null;
+
       try {
-        const { data, error: chatError } = await supabase
+        if (!user.value || !user.value.id) {
+          isLoading.value = false;
+          chats.value = [];
+          return;
+        }
+
+        const { data: chatData, error: chatError } = await supabase
           .from("chats")
           .select(
             `
             id,
-            name,
+            name, 
             updated_at,
             user_id,
             contact_id
@@ -217,15 +226,85 @@ export default {
           .order("updated_at", { ascending: false });
 
         if (chatError) throw chatError;
-        chats.value = data || [];
 
-        // If there are chats, select the first one
-        if (chats.value.length > 0) {
+        if (!chatData || chatData.length === 0) {
+          chats.value = [];
+          isLoading.value = false;
+          return;
+        }
+
+        const processedChats = await Promise.all(
+          chatData.map(async (chat) => {
+            const currentAuthUserId = user.value.id;
+            // Determine the ID of the other user in the chat
+            const otherUserId =
+              chat.user_id === currentAuthUserId
+                ? chat.contact_id
+                : chat.user_id;
+
+            let displayName = chat.name; // Default to the name stored in the chat record
+
+            if (otherUserId) {
+              // Fetch the profile of the other user
+              const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("first_name, last_name")
+                .eq("id", otherUserId)
+                .single();
+
+              if (profile && !profileError) {
+                const fetchedName = `${profile.first_name || ""} ${
+                  profile.last_name || ""
+                }`.trim();
+                if (fetchedName) {
+                  displayName = fetchedName; // Use the fetched full name
+                }
+              } else if (profileError) {
+                console.warn(
+                  `Error fetching profile for user ${otherUserId}:`,
+                  profileError.message
+                );
+                // If profile fetch fails, displayName remains chat.name (from DB)
+              }
+            }
+            // If otherUserId is null (e.g. system chat or error), displayName remains chat.name
+
+            return { ...chat, name: displayName }; // Update the name property for display
+          })
+        );
+
+        chats.value = processedChats;
+
+        // Logic for selecting a chat after loading
+        const sellerIdFromQuery = route.query.seller_id;
+        const isTargetingSpecificChatViaQuery = !!sellerIdFromQuery;
+
+        if (selectedChat.value) {
+          // If a chat is already selected, try to find its updated version
+          const updatedSelectedChatInstance = chats.value.find(
+            (c) => c.id === selectedChat.value.id
+          );
+          if (updatedSelectedChatInstance) {
+            selectedChat.value = updatedSelectedChatInstance; // Refresh its data
+          } else {
+            // Previously selected chat is no longer in the list
+            // If not targeting a new specific chat via query, select the first available, otherwise clear selection.
+            selectedChat.value =
+              !isTargetingSpecificChatViaQuery && chats.value.length > 0
+                ? chats.value[0]
+                : null;
+          }
+        } else if (!isTargetingSpecificChatViaQuery && chats.value.length > 0) {
+          // No chat was selected, and not targeting a specific one via query, so select the first.
           selectChat(chats.value[0]);
         }
-      } catch (error) {
-        console.error("Errore durante il caricamento delle chat:", error);
+        // If isTargetingSpecificChatViaQuery is true and no chat was previously selected,
+        // createChatWithSeller (called in onMounted if query params exist) will handle the selection.
+      } catch (err) {
+        console.error("Errore durante il caricamento delle chat:", err);
         error.value = "Errore durante il caricamento delle chat.";
+      } finally {
+        isLoading.value = false;
       }
     };
 
@@ -351,9 +430,30 @@ export default {
             table: "chats",
             filter: `or(user_id=eq.${user.value.id},contact_id=eq.${user.value.id})`,
           },
-          (payload) => {
-            // Add new chat to the beginning of the list
-            chats.value.unshift(payload.new);
+          async (payload) => {
+            // Make async to fetch profile for new chat
+            const newChat = payload.new;
+            // Fetch profile for the new chat to set the correct name
+            const otherUserId =
+              newChat.user_id === user.value.id
+                ? newChat.contact_id
+                : newChat.user_id;
+            let displayName = newChat.name;
+            if (otherUserId) {
+              const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("first_name, last_name")
+                .eq("id", otherUserId)
+                .single();
+              if (profile && !profileError) {
+                const fetchedName = `${profile.first_name || ""} ${
+                  profile.last_name || ""
+                }`.trim();
+                if (fetchedName) displayName = fetchedName;
+              }
+            }
+            newChat.name = displayName; // Update name before adding
+            chats.value.unshift(newChat);
           }
         )
         .on(
@@ -364,17 +464,43 @@ export default {
             table: "chats",
             filter: `or(user_id=eq.${user.value.id},contact_id=eq.${user.value.id})`,
           },
-          (payload) => {
-            // Update existing chat
-            const index = chats.value.findIndex((c) => c.id === payload.new.id);
+          async (payload) => {
+            // Make async to fetch profile for updated chat
+            const updatedChat = payload.new;
+            const index = chats.value.findIndex((c) => c.id === updatedChat.id);
             if (index !== -1) {
-              // Update the chat
-              chats.value[index] = payload.new;
+              // Fetch profile for the updated chat to set the correct name
+              const otherUserId =
+                updatedChat.user_id === user.value.id
+                  ? updatedChat.contact_id
+                  : updatedChat.user_id;
+              let displayName = updatedChat.name;
+              if (otherUserId) {
+                const { data: profile, error: profileError } = await supabase
+                  .from("profiles")
+                  .select("first_name, last_name")
+                  .eq("id", otherUserId)
+                  .single();
+                if (profile && !profileError) {
+                  const fetchedName = `${profile.first_name || ""} ${
+                    profile.last_name || ""
+                  }`.trim();
+                  if (fetchedName) displayName = fetchedName;
+                }
+              }
+              updatedChat.name = displayName; // Update name before updating in list
 
-              // Move the chat to the top if it was updated
+              chats.value[index] = updatedChat;
               if (index > 0) {
-                const [chat] = chats.value.splice(index, 1);
-                chats.value.unshift(chat);
+                const [chatToMove] = chats.value.splice(index, 1);
+                chats.value.unshift(chatToMove);
+              }
+              // If the currently selected chat is the one updated, refresh its details
+              if (
+                selectedChat.value &&
+                selectedChat.value.id === updatedChat.id
+              ) {
+                selectedChat.value = { ...updatedChat };
               }
             }
           }

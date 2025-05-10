@@ -213,14 +213,27 @@ const promoMessage = ref<string>("");
 const discount = ref<number>(0);
 const isPromoError = ref<boolean>(false);
 
-// Check if user is logged in
+// Aggiungere currentUserId
+const currentUserId = ref<string | null>(null);
+
+// Aggiornare checkAuth per impostare currentUserId
 const checkAuth = async () => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    isAuthenticated.value = !!session;
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      currentUserId.value = data.user.id;
+      isAuthenticated.value = true;
+    } else {
+      currentUserId.value = null;
+      isAuthenticated.value = false;
+      error.value =
+        "Devi effettuare il login per visualizzare il tuo carrello.";
+    }
   } catch (err) {
-    console.error("Error checking authentication:", err);
+    console.error("Errore durante il recupero dell'utente:", err);
+    currentUserId.value = null;
     isAuthenticated.value = false;
+    error.value = "Errore durante l'autenticazione.";
   }
 };
 
@@ -237,39 +250,72 @@ const fetchCartItems = async () => {
   isLoading.value = true;
   error.value = null;
 
-  try {
-    const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
+  if (!isAuthenticated.value) {
+    error.value = "Devi effettuare il login per visualizzare il tuo carrello.";
+    cartItems.value = [];
+    isLoading.value = false;
+    return;
+  }
 
-    if (savedCart.length === 0) {
+  try {
+    // Check if user_carts table exists
+    const { error: tableCheckError } = await supabase
+      .from("user_carts")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (tableCheckError && tableCheckError.code === "42P01") {
+      error.value = "Carrello non disponibile. Contatta l'amministratore.";
+      console.error(
+        "user_carts table doesn't exist! Run the database setup script."
+      );
       cartItems.value = [];
       isLoading.value = false;
       return;
     }
 
-    const { data, error: fetchError } = await supabase
+    // Ottieni elementi dal carrello per l'utente corrente
+    const { data: cartData, error: cartError } = await supabase
+      .from("user_carts")
+      .select("product_id, quantity")
+      .eq("user_id", currentUserId.value);
+
+    if (cartError) throw cartError;
+
+    if (!cartData || cartData.length === 0) {
+      cartItems.value = [];
+      isLoading.value = false;
+      return;
+    }
+
+    // Estrai gli ID dei prodotti
+    const productIds = cartData.map((item) => item.product_id);
+
+    // Carica i dettagli dei prodotti
+    const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select("*")
-      .in("id", savedCart);
+      .in("id", productIds);
 
-    if (fetchError) throw fetchError;
+    if (productsError) throw productsError;
 
-    if (!data || data.length === 0) {
-      cartItems.value = [];
-      isLoading.value = false;
-      return;
-    }
-
-    cartItems.value = data.map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: parseFloat(item.price) || 0,
-      quantity: 1,
-      metadata: item.metadata || {},
-    }));
+    // Combina i dati di prodotti e quantità
+    cartItems.value = productsData.map((product) => {
+      const cartItem = cartData.find((item) => item.product_id === product.id);
+      return {
+        id: product.id,
+        name: product.name || "Prodotto senza nome",
+        price: parseFloat(product.price) || 0,
+        quantity: cartItem ? cartItem.quantity : 1,
+        metadata: product.metadata || {},
+      };
+    });
   } catch (err) {
     console.error("Error loading cart items:", err);
     error.value =
       "Impossibile caricare i dati del carrello. Riprova più tardi.";
+    cartItems.value = [];
   } finally {
     isLoading.value = false;
   }
@@ -314,15 +360,30 @@ const cartTotal = computed(() =>
 );
 
 // Rimuovi un libro dal carrello
-const removeItem = (index: number) => {
-  const removedItem = cartItems.value.splice(index, 1);
+const removeItem = async (index: number) => {
+  if (!isAuthenticated.value || !currentUserId.value) {
+    alert("Devi essere loggato per modificare il carrello.");
+    return;
+  }
 
-  // Aggiorna il carrello salvato in localStorage
-  const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-  const updatedCart = savedCart.filter(
-    (id: string) => id !== removedItem[0].id
-  );
-  localStorage.setItem("cart", JSON.stringify(updatedCart));
+  try {
+    const itemToRemove = cartItems.value[index];
+
+    // Rimuovi l'elemento da Supabase
+    const { error: deleteError } = await supabase
+      .from("user_carts")
+      .delete()
+      .eq("user_id", currentUserId.value)
+      .eq("product_id", itemToRemove.id);
+
+    if (deleteError) throw deleteError;
+
+    // Aggiorna lo stato locale
+    cartItems.value.splice(index, 1);
+  } catch (err) {
+    console.error("Error removing from cart:", err);
+    alert("Errore durante la rimozione dal carrello.");
+  }
 };
 
 // Recupera i dati al montaggio del componente
@@ -334,7 +395,7 @@ onMounted(async () => {
 const applyPromoCode = () => {
   const code = promoCode.value.trim().toUpperCase(); // Pulisci e metti in maiuscolo
   isPromoError.value = false;
-  
+
   if (code === "SCONTO10") {
     discount.value = 10;
     promoMessage.value = "Sconto 10% applicato!";
@@ -358,21 +419,72 @@ const resetPromo = () => {
   discount.value = 0;
 };
 
-const checkout = () => {
-  console.log("Procedendo al checkout con:", {
-    items: cartItems.value.map((item) => ({
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-    })),
-    subtotal: cartTotal.value,
-    discountApplied: discount.value,
-    shipping: shippingCost.value,
-    total: totalWithShipping.value,
-    promoCode: promoCode.value,
-  });
-  alert("Procedi al pagamento (simulazione)");
+// Nuova funzione per aggiornare la quantità
+const updateQuantity = async (itemId: string, newQuantity: number) => {
+  if (newQuantity < 1) return;
+
+  if (!isAuthenticated.value || !currentUserId.value) {
+    alert("Devi essere loggato per modificare il carrello.");
+    return;
+  }
+
+  try {
+    // Aggiorna la quantità in Supabase
+    const { error: updateError } = await supabase
+      .from("user_carts")
+      .update({ quantity: newQuantity })
+      .eq("user_id", currentUserId.value)
+      .eq("product_id", itemId);
+
+    if (updateError) throw updateError;
+
+    // Aggiorna lo stato locale
+    const item = cartItems.value.find((item) => item.id === itemId);
+    if (item) {
+      item.quantity = newQuantity;
+    }
+  } catch (err) {
+    console.error("Error updating quantity:", err);
+    alert("Errore durante l'aggiornamento della quantità.");
+  }
+};
+
+// Aggiorna checkout per svuotare il carrello dopo l'acquisto
+const checkout = async () => {
+  if (
+    !isAuthenticated.value ||
+    !currentUserId.value ||
+    cartItems.value.length === 0
+  ) {
+    return;
+  }
+
+  try {
+    // Rimuovi tutti gli elementi dal carrello dell'utente
+    const { error: deleteError } = await supabase
+      .from("user_carts")
+      .delete()
+      .eq("user_id", currentUserId.value);
+
+    if (deleteError) throw deleteError;
+
+    // Registra i dettagli dell'ordine (simulazione)
+    console.log("Ordine completato:", {
+      items: cartItems.value,
+      subtotal: cartTotal.value,
+      discountApplied: discount.value,
+      shipping: shippingCost.value,
+      total: totalWithShipping.value,
+      promoCode: promoCode.value,
+      timestamp: new Date(),
+    });
+
+    alert("Ordine completato! Grazie per il tuo acquisto.");
+    cartItems.value = [];
+  } catch (err) {
+    console.error("Error during checkout:", err);
+    alert("Si è verificato un errore durante il checkout.");
+  }
 };
 </script>
 

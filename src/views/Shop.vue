@@ -165,6 +165,24 @@ const fetchRecentBooks = async () => {
   error.value = null;
 
   try {
+    // First check if the products table exists
+    const { error: tableCheckError } = await supabase
+      .from("products")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (tableCheckError && tableCheckError.code === "42P01") {
+      // Products table doesn't exist
+      error.value =
+        "Database non configurato correttamente. Contatta l'amministratore.";
+      console.error(
+        "Products table doesn't exist! Please create the database tables."
+      );
+      recentBooks.value = getPlaceholderBooks(); // Use placeholder data
+      return;
+    }
+
     // Query to get the most recently added books
     const { data, error: fetchError } = await supabase
       .from("products")
@@ -175,7 +193,8 @@ const fetchRecentBooks = async () => {
     if (fetchError) throw fetchError;
 
     // Properly type cast and handle empty results
-    if (data) {
+    if (data && data.length > 0) {
+      console.log("Fetched books:", data.length);
       recentBooks.value = data.map((item) => ({
         id: item.id,
         name: item.name || "Titolo non disponibile",
@@ -187,14 +206,13 @@ const fetchRecentBooks = async () => {
         metadata: item.metadata || {},
       }));
     } else {
-      recentBooks.value = [];
+      console.warn("No books found in the database");
+      recentBooks.value = getPlaceholderBooks(); // Use placeholder data when no books found
     }
   } catch (err) {
     console.error("Error fetching books:", err);
     error.value = "Impossibile caricare i libri recenti. Riprova più tardi.";
-
-    // Provide placeholder data in development
-    recentBooks.value = getPlaceholderBooks();
+    recentBooks.value = getPlaceholderBooks(); // Use placeholder data on error
   } finally {
     isLoading.value = false;
   }
@@ -330,14 +348,43 @@ const addToCart = async (bookId: string, event: Event) => {
   // Ferma la propagazione dell'evento per evitare navigazione
   event.stopPropagation();
 
+  // Verificare che l'utente sia autenticato
+  if (!currentUserId.value) {
+    alert("Devi effettuare il login per aggiungere al carrello.");
+    // Opzionalmente reindirizza al login: router.push('/login');
+    return;
+  }
+
   try {
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    if (!cart.includes(bookId)) {
-      cart.push(bookId);
-      localStorage.setItem("cart", JSON.stringify(cart));
-      alert("Libro aggiunto al carrello!");
+    // Verifica se l'elemento è già nel carrello
+    const { data: existingItem, error: checkError } = await supabase
+      .from("user_carts")
+      .select("id, quantity")
+      .eq("user_id", currentUserId.value)
+      .eq("product_id", bookId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+
+    if (existingItem) {
+      // Se l'elemento esiste già, aumenta la quantità
+      const { error: updateError } = await supabase
+        .from("user_carts")
+        .update({ quantity: existingItem.quantity + 1 })
+        .eq("id", existingItem.id);
+
+      if (updateError) throw updateError;
+      alert("Quantità aumentata nel carrello!");
     } else {
-      alert("Questo libro è già nel carrello.");
+      // Se l'elemento non esiste, aggiungilo
+      const { error: insertError } = await supabase.from("user_carts").insert({
+        user_id: currentUserId.value,
+        product_id: bookId,
+        quantity: 1,
+      });
+
+      if (insertError) throw insertError;
+      alert("Libro aggiunto al carrello!");
     }
   } catch (err) {
     console.error("Error adding to cart:", err);
