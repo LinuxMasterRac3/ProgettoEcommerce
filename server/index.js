@@ -23,7 +23,9 @@ app.use("/api/delete-stripe-products", deleteStripeProducts); // Usa app.use per
 app.use("/api/send-confirmation-email", sendConfirmationEmail);
 
 // Porta del server
-const PORT = 3000; // Cambia la porta
+
+const PORT = 3000;
+// Cambia la porta
 app.post("/api/create-checkout-session", createCheckoutSession);
 app.listen(PORT, () => {
   console.log(`Server avviato su http://localhost:${PORT}`);
